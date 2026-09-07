@@ -220,6 +220,16 @@
                       <geom mesh="hand_3" material="white" class="visual"/>
                       <geom mesh="hand_4" material="off_white" class="visual"/>
                       <geom mesh="hand_c" class="collision"/>
+                      <!-- M2: wrist / end-effector camera. Rigidly attached to `hand`.
+                           Looks along the gripper approach axis (hand +z), which points
+                           straight down toward the area in front of the gripper in the
+                           home/ready pose. Placed 0.20 m out along +z (~7 cm past the
+                           fingertips, so they never streak across the view) and offset
+                           +12 cm along hand +x, which puts the gripper mesh and its
+                           shadow into one corner and leaves the bed surface / nearby
+                           plants filling the rest of the frame. Separate from the
+                           worldbody `rgb_camera` overview, which is unchanged. -->
+                      <camera name="wrist_camera" pos="0.12 0 0.2" xyaxes="1 0 0 0 -1 0" fovy="60"/>
                       <body name="left_finger" pos="0 0 0.0584">
                         <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>
                         <joint name="finger_joint1" class="finger"/>

@@ -55,7 +55,7 @@ VLA-Weed-Extraction/
 ├── .gitignore
 ├── simulation/
 │   ├── models/
-│   │   ├── mobile_panda.xml      # M1: Panda arm + gripper mounted on a mobile base (x-axis slide joint + `base_x` position servo)
+│   │   ├── mobile_panda.xml      # M1: Panda arm + gripper mounted on a mobile base (x-axis slide joint + `base_x` position servo). M2: `wrist_camera` rigidly attached to the `hand` body (downward end-effector view).
 │   │   ├── scene_mobile_field.xml # M1: project-owned field scene (beds + plants + lights + camera) that includes mobile_panda.xml — ACTIVE SCENE from M1 on. Declares the 3 plant meshes itself (absolute file paths) instead of `<include>`-ing the stub XMLs, so the plant assets load regardless of the Franka `meshdir` inherited from mobile_panda.xml.
 │   │   ├── strawberry.xml        # stub: 1 mesh asset (STL, scale 0.18 -0.18 0.18) + empty template body. Unchanged; no longer included by the active scene (M1 path fix).
 │   │   ├── sowthistle.xml        # stub: 1 mesh asset (STL, scale 0.05) + empty template body. Unchanged; not included by the active scene.
@@ -82,7 +82,8 @@ VLA-Weed-Extraction/
 │   └── lerobot/                  # git submodule, installed editable into .venv
 ├── scripts/                      # empty
 ├── datasets/                     # empty
-├── docs/                         # empty
+├── docs/
+│   └── m2/                        # M2 verification renders: wrist_camera_home.png, wrist_camera_over_bed.png
 ├── models/                       # empty
 ├── .venv/                        # Python venv (mujoco 3.8.1, lerobot, torch, ...) — gitignored
 └── .venv_py310/                  # Python 3.10 venv (mujoco 3.11.0) — gitignored
@@ -106,10 +107,22 @@ paths (absolute paths bypass `meshdir`), and does **not** `<include>` the plant
 stub XMLs. Result: the scene compiles whether loaded by absolute or relative path.
 The Franka arm meshes are unaffected (bare filenames + the Franka `meshdir`).
 
-Compiled size: `nq=10 nv=10 nu=9 nbody=29 ncam=1 nmesh=70` (extra `base_slide_x`
+Compiled size: `nq=10 nv=10 nu=9 nbody=29 ncam=2 nmesh=70` (extra `base_slide_x`
 DOF + `base_x` actuator vs. legacy; `nbody` is 3 lower than a naive copy because
-the unused empty `*_template` bodies from the plant stubs are no longer included).
-A non-colliding `base_cart` visual box is attached to `mobile_base`.
+the unused empty `*_template` bodies from the plant stubs are no longer included;
+`ncam=2` since M2 added `wrist_camera`). A non-colliding `base_cart` visual box is
+attached to `mobile_base`.
+
+Cameras (2): `rgb_camera` — worldbody, `mode="track" target="link0"`, distant
+third-person overview (unchanged since the legacy scene). `wrist_camera` — M2,
+declared inside the `hand` body in `mobile_panda.xml`, so it is rigid to the
+end-effector; aimed along the gripper approach axis (hand +z), which points
+straight down (world −z) in the `home` pose. `pos="0.12 0 0.2"` (hand frame):
+0.20 m out along +z sits it ~7 cm past the fingertips so they never streak
+across the frame, and the +12 cm along hand +x pushes the gripper mesh and its
+cast shadow into one corner, leaving the bed surface / nearby plants filling
+the rest of the view. `fovy="60"`. (Corrected 2026-09-07 — the first M2 value
+`pos="0.05 0 0"` sat level with the fingers and they dominated the frame.)
 
 ### Legacy scene: `external/mujoco_menagerie/franka_emika_panda/scene.xml`
 
@@ -141,6 +154,7 @@ Verified compile (mujoco 3.8.1): `nq=9`, `nu=8`, `nbody=31`, `ncam=1`, **no free
 | Panda arm actuation | Works open-loop. 7 arm position actuators + 1 tendon-coupled gripper actuator (`actuator8`, `ctrlrange 0..255`). `home` keyframe present. |
 | **Mobile base (M1)** | Works. `base_slide_x` prismatic joint (world x, range −2..4 m) driven by `base_x` position servo (`<position>` kp 2000, kv 300). Commanding `ctrl["base_x"]` translates the entire Panda along x; arm stays rigidly attached and holds its joint targets. Verified in `scene_mobile_field.xml`. |
 | Two raised soil beds + plant layout | Present in the scene (static geometry). |
+| **Wrist camera (M2)** | Works. `wrist_camera` fixed to the `hand` body, looking straight down along the gripper approach axis (hand +z ≈ world −z at `home`). Rigid to the end-effector (base/arm motion carries it exactly; verified drift ~1e-16 m in the hand frame). With the gripper posed over a bed, the offscreen render is a usable close-range top-down view: bed soil texture fills the frame, plants are clearly visible, the gripper mesh + shadow sit in one corner (~10 % of the frame). `rgb_camera` overview preserved and still renders. |
 | Toolchain | Installed in `.venv`: `mujoco`, `lerobot`, `torch`, `gymnasium`, `gym-hil`, `opencv-python`, `pillow`, `numpy`. |
 
 ## 6. Current Limitations / Missing Components
@@ -153,7 +167,7 @@ Verified compile (mujoco 3.8.1): `nq=9`, `nu=8`, `nbody=31`, `ncam=1`, **no free
 - **No controller.** No inverse kinematics, no trajectory generation, no feedback control, no camera→world deprojection anywhere in the repo.
 - **No orchestration.** `scripts/` is empty; there is no state machine.
 - **Non-functional stubs.** `src/tools/camera_controller.py` is empty; `simulation/models/*.xml` are asset-only; `weed.glb` and `strawberry.glb` are 0 bytes.
-- **No wrist/hand camera** for close-range servoing; the only camera is a distant third-person view.
+- ~~**No wrist/hand camera.**~~ Resolved in M2: `wrist_camera` is fixed to the `hand` body for close-range viewing. Its aim is fixed geometry only (straight down the approach axis); no perception, deprojection, or servoing uses it yet (M6+).
 - ~~**Scene file location.**~~ Resolved in M1: the active scene is now `simulation/models/scene_mobile_field.xml` (project-owned). The vendored `scene.xml` is left untouched and still used by the legacy `src/` scripts.
 - **Asset-path fragility (active scene: fixed; legacy scene: not).** MuJoCo prepends the inherited `meshdir` to relative mesh paths, which breaks the plant `<mesh file="../assets/plants/...">` entries in the stub XMLs. `scene_mobile_field.xml` works around this by declaring the plant meshes itself with **absolute** file paths (so it loads under any working dir). The **legacy** vendored `scene.xml` still has the bug and only compiles when loaded via an absolute path — the `src/` scripts do that via `Path(...).resolve()`. The absolute plant-mesh paths in `scene_mobile_field.xml` hardcode the repo location (`/home/divya/VLA-Weed-Extraction/...`); a cleaner fix (correcting `mobile_panda.xml`'s `meshdir`, or a shared `assetdir`) is deferred to M2.
 - **No datasets / no policy code** despite `lerobot` being installed; `datasets/` is empty.
@@ -168,8 +182,8 @@ Each milestone must leave the project in a runnable, verifiable state. Do not st
 - **M1 — Mobile base. ✅ DONE (2026-09-06, see Change Log).**
   `mobile_panda.xml` mounts the Panda on a `mobile_base` body with a prismatic `base_slide_x` joint (world x) and a `base_x` `<position>` servo; `scene_mobile_field.xml` is the new active scene. Arm + gripper actuators unchanged and preserved (`actuator1..8`).
 
-- **M2 — Combined field scene + wrist camera.**
-  One project-owned scene including the mobile Panda + both beds + plants. Add a `<camera>` on `hand` (wrist view); keep an overview camera. Verify both render.
+- **M2 — Combined field scene + wrist camera. ✅ DONE (2026-09-07, see Change Log).**
+  `scene_mobile_field.xml` already combines the mobile Panda + both beds + plants. Added `<camera name="wrist_camera">` inside the `hand` body of `mobile_panda.xml`; the worldbody `rgb_camera` overview is preserved. Both cameras compile and render offscreen.
 
 - **M3 — Plant physics: freejoint + breakable root.**
   Add `<freejoint>` to each plant and a breakable ground attachment (weld/connect equality with a tuned yield force, or an anchoring tendon/spring). Tune so a firm upward pull (order a few N) releases the plant. Verify by scripting a yank.
@@ -200,6 +214,7 @@ Each milestone must leave the project in a runnable, verifiable state. Do not st
 - **Simulator:** MuJoCo (native `mujoco` Python bindings + `mujoco.viewer`). **Pinned to `.venv` (mujoco 3.8.1)** as of M1; `.venv_py310` is not used.
 - **M1 base parameters:** slide joint `base_slide_x`, axis `1 0 0`, range `-2 4` m, `damping=50`, `armature=1`, `frictionloss=1`; base `inertial mass=30`; actuator `base_x` = `<position>` `kp=2000 kv=300`, `ctrlrange="-2 4"`, `forcerange="-1500 1500"`; `ctrl["base_x"]` is the target base x in metres. `base_cart` geom is visual-only (`contype=0 conaffinity=0`).
 - **Actuator order (M1 scene):** `actuator1..7` (arm), `actuator8` (gripper), `base_x` (index 8). Arm/gripper indices are unchanged from the legacy model; the base actuator was appended.
+- **M2 wrist camera parameters:** `<camera name="wrist_camera">` in the `hand` body of `mobile_panda.xml`; `pos="0.12 0 0.2"` (hand frame), `xyaxes="1 0 0 0 -1 0"` (camera x = hand +x, camera −z = hand +z, so it looks along the gripper approach axis), `fovy="60"`, default `mode="fixed"`. In the `home` pose the optical axis is world −z (straight down); verified `view_dir.z = −1.000`. The 0.20 m +z component clears the fingertips (~0.108 m in the hand frame) so they never streak the frame; the 0.12 m +x component offsets the gripper mesh + cast shadow into a corner. No actuator, joint, DOF, or `home` keyframe change — camera-only. **First value `pos="0.05 0 0"` was rejected** (sat at finger-base height → gripper filled the view); corrected 2026-09-07.
 - **qpos order (M1 scene):** `[base_slide_x, joint1..7, finger_joint1, finger_joint2]` (`nq=10`). `home` keyframe updated accordingly.
 - **Robot:** Franka Emika Panda, 7-DOF arm + parallel gripper. Gripper is tendon-coupled via `actuator8` with a remapped `ctrlrange="0 255"` (0 = closed target, 255 = open target). Arm actuators are position-servo `general` actuators.
 - **Angles:** radians (`compiler angle="radian"`).
@@ -317,3 +332,48 @@ Also update the relevant numbered sections above (structure, what works, limitat
   - Plant meshes are declared in `scene_mobile_field.xml` with absolute paths; plant stub XMLs are retained on disk but unused by the active scene.
   - `nbody` for the active scene is 29 (the 3 empty `*_template` bodies are gone); 16 plant bodies + robot chain + world/beds intact.
   - Known debt (M2): absolute paths hardcode the repo location.
+
+#### 2026-09-07 — M2: wrist / end-effector camera
+
+- **Milestone completed:** M2 (wrist camera; the "combined field scene" half was already satisfied by `scene_mobile_field.xml` from M1).
+- **Files changed:**
+  - **Modified** `simulation/models/mobile_panda.xml` — one addition: a `<camera name="wrist_camera" pos="0.05 0 0" xyaxes="1 0 0 0 -1 0" fovy="60"/>` element inside `<body name="hand">`, placed right after the `hand_c` collision geom and before `<body name="left_finger">`, with an explanatory comment. Nothing else touched — no change to bodies, joints, DOFs, actuators, tendons, equalities, or the `home` keyframe.
+  - **Not touched:** `simulation/models/scene_mobile_field.xml` (its worldbody `rgb_camera` is unchanged and still the overview), all plant/scene geometry, `external/**` (vendored `scene.xml` unchanged), `src/**`, `scripts/**`.
+- **Implementation details:** the camera is declared as a child of the `hand` body, so it is rigidly welded to the end-effector and inherits both base translation (M1) and future arm motion. Orientation `xyaxes="1 0 0 0 -1 0"` sets the camera frame so its viewing axis (−z of the camera frame) coincides with the hand's +z axis — the gripper approach / grasp direction. In the Panda `home` ready pose the hand +z points straight down, so the wrist camera looks vertically onto the bed surface just beyond the fingertips. The +x (hand-frame) 5 cm offset shifts the fingers to the edge of the image so most of the frame is bed/plants. `fovy=60` widens the close-range view. `mode` left at the default `fixed` (pose fully determined by the parent body; no tracking target needed). This is passive sensor geometry only — no perception, IK, servoing, grasping, pulling, or autonomous motion was added.
+- **Tests performed and results** (`.venv`, MuJoCo 3.8.1, headless, `MUJOCO_GL=egl`; script `scratchpad/m2_test.py`):
+  - **Compile:** `scene_mobile_field.xml` loads. `nq=10 nv=10 nu=9 nbody=29 ncam=2 nmesh=70` — only `ncam` changed vs. M1 (1 → 2). Cameras: `['rgb_camera', 'wrist_camera']`. `wrist_camera` `cam_bodyid` → body `hand`, `mode=0` (fixed).
+  - **M1 preserved:** joints `['base_slide_x','joint1'..'joint7','finger_joint1','finger_joint2']`; actuators `['actuator1'..'actuator8','base_x']` — unchanged order/count. Physics: 2000 `mj_step` from `home`, all `qpos`/`qvel` finite, `max|qvel| ≈ 6e-6` (at rest).
+  - **Rigid attachment:** `cam_xpos − hand_xpos` offset = `[~0, 0.05, ~0]` at base x=0; after commanding `base_x → 2.0` and stepping 4000×, offset drift = `1.7e-5` m; hand moved `dx=2.002`, camera moved `dx=2.002` (moves with the end-effector).
+  - **Aim:** at `home`, `wrist_camera` world view direction = `[0, 0, -1.000]` → straight down toward the bed. Assertion `view_dir.z < -0.5` passes.
+  - **Render:** offscreen `mujoco.Renderer` 640×480. `wrist_camera` → `640×480×3 uint8`, mean 104, 100 % non-black; image shows the bed soil texture from above with the gripper fingers at the left edge and a plant in-frame (`scratchpad/m2_wrist_camera.png`). `rgb_camera` also renders unchanged (`scratchpad/m2_rgb_camera.png`, mean 101).
+  - **Regression:** vendored `external/.../franka_emika_panda/scene.xml` still compiles (`nq=9 nu=8 nbody=31 ncam=1`); no `src/` script references `mobile_panda.xml`.
+  - Result: **ALL M2 CHECKS PASSED.**
+- **Current project status:** mobile base (M1) + wrist camera (M2) both working and verified. The active scene `scene_mobile_field.xml` now exposes two cameras: `rgb_camera` (overview) and `wrist_camera` (end-effector, downward). Still no plant physics, textures, perception, IK, grasp, pull, base motion controller, or orchestration.
+- **Next milestone:** **M3 — plant physics: `<freejoint>` + breakable root** (add a `freejoint` to each plant body and a breakable ground attachment tuned so a few-newton upward pull releases the plant; verify with a scripted yank).
+- **Decisions / parameters introduced:**
+  - `wrist_camera` lives in `mobile_panda.xml` (the robot model), not the scene file, so any scene that includes the mobile Panda gets the end-effector view for free.
+  - Camera aim is fixed geometry along the gripper approach axis (hand +z); no dynamic tracking. Params: `pos="0.05 0 0"`, `xyaxes="1 0 0 0 -1 0"`, `fovy="60"`.
+  - `rgb_camera` is the designated overview camera and is left exactly as inherited from the legacy scene.
+
+#### 2026-09-07 — M2 correction: wrist camera placement
+
+- **Milestone:** M2 follow-up (no new milestone started). The first M2 wrist-camera render was judged not useful — `pos="0.05 0 0"` put the camera at finger-base height looking parallel to the fingers, so the gripper/fingers and their shadows streaked across and dominated the frame.
+- **Files changed:**
+  - **Modified** `simulation/models/mobile_panda.xml` — the `wrist_camera` element only: `pos` `"0.05 0 0"` → `"0.12 0 0.2"` (hand frame); `xyaxes="1 0 0 0 -1 0"` and `fovy="60"` unchanged; comment updated. No other line touched. Still a child of `<body name="hand">` (rigid to the end-effector); orientation still straight down the gripper approach axis.
+  - **Not touched:** `scene_mobile_field.xml` (`rgb_camera` overview unchanged), `external/**`, `src/**`, all M1 robot/base/actuator/keyframe content.
+- **Why this placement:** raycast + render diagnostics showed (a) the fingertips reach ≈0.108 m along hand +z, so a camera at `z=0` looks straight along them → edge-on streaks; (b) the wide dark bands in the first render were the arm/gripper **shadows** cast onto the ground (confirmed: they vanish with `mjRND_SHADOW` off); (c) in the `home` park pose the TCP hangs over the ~0.3 m central walkway between the two beds, not over a bed. Fix: move the camera 0.20 m out along +z (≈7 cm past the fingertips — no more finger streaks) and 0.12 m along hand +x (shifts the gripper mesh + its shadow into one image corner). Orientation left straight-down: correct for eye-in-hand servoing, where the optical axis should track the approach vector rather than being permanently canted at one bed.
+- **Tests performed and results** (`.venv`, MuJoCo 3.8.1, headless `MUJOCO_GL=egl`; `scratchpad/m2_test.py`):
+  - **Compile:** `scene_mobile_field.xml` loads. `nq=10 nv=10 nu=9 nbody=29 ncam=2 nmesh=70` (unchanged from the first M2). Cameras `['rgb_camera','wrist_camera']`; `wrist_camera` → body `hand`, `mode=fixed`.
+  - **M1 preserved:** joints and actuators identical list/order; 2000 `mj_step` from `home` all finite, `max|qvel|≈6e-6`.
+  - **Rigid attach:** camera position in the hand body frame = `[0.12, 0, 0.20]` exactly; after `base_x → 2.0` + 4000 steps the hand-frame offset drift is `1.6e-16` m (world-frame offset moves ~1e-3 m, but that is just arm-joint flex under the base accel, not the camera).
+  - **Aim:** `home`-pose world view direction `[0, 0, -1.000]` (straight down).
+  - **Render — both cameras, `home` pose:** `rgb_camera` mean 101.5, unchanged. `wrist_camera` mean 103.1, 100 % non-black (`docs/m2/wrist_camera_home.png`). At `home` the wrist view is over the bare walkway with arm shadows down the left ~third — a park-pose artifact, not representative of operation.
+  - **Render — `wrist_camera`, gripper posed over bed2** (static `qpos`: `joint1 = 0.85` rad; **no controller/IK added**, this is only to place the TCP over a bed for the usefulness check): `docs/m2/wrist_camera_over_bed.png`. Bed soil texture fills the frame, a weed is clearly visible (bottom-left), the gripper mesh is a small wedge in the top-right corner with a modest shadow. Heuristic: scene-content (ground+plant mid-tones) = **99.6 %** of the frame; bright-green (plants + gripper edge) = 8.5 %. Assertions `green ∈ (2,45) %` and `content > 60 %` pass.
+  - **Regression:** vendored `external/.../scene.xml` still compiles (`nq=9 nu=8 nbody=31 ncam=1`); no `src/` script references `mobile_panda.xml`.
+  - Result: **ALL M2 CHECKS PASSED.** The over-bed render is a usable input for future weed perception (M6).
+- **Current project status:** M1 (mobile base) + M2 (wrist camera, corrected) working and verified. Active scene `scene_mobile_field.xml` exposes `rgb_camera` (overview) + `wrist_camera` (end-effector, straight-down, gripper in-corner). No plant physics, textures, perception, IK, grasp, pull, base controller, or orchestration.
+- **Next milestone:** **M3 — plant physics: `<freejoint>` + breakable root** (not started).
+- **Decisions / parameters introduced:**
+  - Final `wrist_camera` params: `pos="0.12 0 0.2"`, `xyaxes="1 0 0 0 -1 0"`, `fovy="60"`, in the `hand` body.
+  - Wrist camera stays straight-down (approach-axis aligned), not canted toward a bed — the eye-in-hand convention for later servoing.
+  - The `home` park pose leaves the TCP over the central walkway; a representative wrist view requires the arm/base to first position the gripper over a bed (that positioning logic is M5/M7, not M2).
