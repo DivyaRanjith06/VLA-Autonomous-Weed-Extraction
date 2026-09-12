@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weed-extraction"
+version = "0.1.0"
+description = "MuJoCo weed-extraction environment and launcher"
+requires-python = ">=3.12"
+# Exact pins, matching the Docker image, so every machine runs the same versions.
+dependencies = [
+    "mujoco==3.8.1",
+    "gymnasium==1.3.0",
+    "numpy==2.2.6",
+    "opencv-python==4.12.0.88",
+    "draccus==0.11.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+weed-launch = "weed_extraction.launch:main"
+
+[tool.setuptools]
+packages = ["weed_extraction"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

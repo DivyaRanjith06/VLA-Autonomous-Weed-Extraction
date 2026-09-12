@@ -1,0 +1,10 @@
+# The image carries the workspace so it can run on its own; devel.sh mounts the repo
+# over it for development. Everything here is either rebuilt inside, or host-only.
+**/.git
+.venv*/
+**/__pycache__
+**/*.egg-info
+.pytest_cache/
+.DS_Store
+outputs/
+docs/

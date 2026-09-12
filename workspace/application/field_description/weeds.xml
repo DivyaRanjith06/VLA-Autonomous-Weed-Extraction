@@ -1,0 +1,564 @@
+<mujoco model="weeds">
+
+    <!--
+      The weeds, included by scene_mobile_field.xml (mesh paths resolve from there).
+
+      Each weed is a free body welded to the soil; weed_extraction.env cuts the weld
+      once the pull passes ROOT_BREAK_FORCE. The bottom 4 cm is one rigid link, so the
+      gripper always has something solid to hold; above it the stalk is 3 links on
+      sprung hinges, which bend away when the arm brushes them and spring back.
+
+      The pretty mesh never collides: MuJoCo would replace it with a convex hull
+      20-70 mm wide where the real stem is 1-2.5 mm. Collision comes from the convex
+      decomposition instead, each piece parented to the segment it sits in.
+    -->
+
+    <asset>
+        <!-- sowthistle, 0.18 m tall: the visual mesh split into one band per
+             segment, and the CoACD collision pieces it was decomposed into. -->
+        <texture name="sowthistle_plant" type="2d" file="assets/plants/sowthistle/sowthistle_plant.png"/>
+        <material name="sowthistle_plant" texture="sowthistle_plant" specular="0.1" shininess="0.1"/>
+        <mesh name="sowthistle_band_0" file="../../../../application/field_description/assets/plants/sowthistle/bands/sowthistle_band_0.obj"/>
+        <mesh name="sowthistle_band_1" file="../../../../application/field_description/assets/plants/sowthistle/bands/sowthistle_band_1.obj"/>
+        <mesh name="sowthistle_band_2" file="../../../../application/field_description/assets/plants/sowthistle/bands/sowthistle_band_2.obj"/>
+        <mesh name="sowthistle_band_3" file="../../../../application/field_description/assets/plants/sowthistle/bands/sowthistle_band_3.obj"/>
+        <mesh name="sowthistle_col_0" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_0.obj"/>
+        <mesh name="sowthistle_col_1" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_1.obj"/>
+        <mesh name="sowthistle_col_2" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_2.obj"/>
+        <mesh name="sowthistle_col_3" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_3.obj"/>
+        <mesh name="sowthistle_col_4" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_4.obj"/>
+        <mesh name="sowthistle_col_5" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_5.obj"/>
+        <mesh name="sowthistle_col_6" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_6.obj"/>
+        <mesh name="sowthistle_col_7" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_7.obj"/>
+        <mesh name="sowthistle_col_8" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_8.obj"/>
+        <mesh name="sowthistle_col_9" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_9.obj"/>
+        <mesh name="sowthistle_col_10" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_10.obj"/>
+        <mesh name="sowthistle_col_11" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_11.obj"/>
+        <mesh name="sowthistle_col_12" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_12.obj"/>
+        <mesh name="sowthistle_col_13" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_13.obj"/>
+        <mesh name="sowthistle_col_14" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_14.obj"/>
+        <mesh name="sowthistle_col_15" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_15.obj"/>
+        <mesh name="sowthistle_col_16" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_16.obj"/>
+        <mesh name="sowthistle_col_17" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_17.obj"/>
+        <mesh name="sowthistle_col_18" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_18.obj"/>
+        <mesh name="sowthistle_col_19" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_19.obj"/>
+        <mesh name="sowthistle_col_20" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_20.obj"/>
+        <mesh name="sowthistle_col_21" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_21.obj"/>
+        <mesh name="sowthistle_col_22" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_22.obj"/>
+        <mesh name="sowthistle_col_23" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_23.obj"/>
+        <mesh name="sowthistle_col_24" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_24.obj"/>
+        <mesh name="sowthistle_col_25" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_25.obj"/>
+        <mesh name="sowthistle_col_26" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_26.obj"/>
+        <mesh name="sowthistle_col_27" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_27.obj"/>
+        <mesh name="sowthistle_col_28" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_28.obj"/>
+        <mesh name="sowthistle_col_29" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_29.obj"/>
+        <mesh name="sowthistle_col_30" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_30.obj"/>
+        <mesh name="sowthistle_col_31" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_31.obj"/>
+        <mesh name="sowthistle_col_32" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_32.obj"/>
+        <mesh name="sowthistle_col_33" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_33.obj"/>
+        <mesh name="sowthistle_col_34" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_34.obj"/>
+        <mesh name="sowthistle_col_35" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_35.obj"/>
+        <mesh name="sowthistle_col_36" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_36.obj"/>
+        <mesh name="sowthistle_col_37" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_37.obj"/>
+        <mesh name="sowthistle_col_38" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_38.obj"/>
+        <mesh name="sowthistle_col_39" file="../../../../application/field_description/assets/plants/sowthistle/collision/sowthistle_col_39.obj"/>
+        <!-- shepherd, 0.12 m tall: the visual mesh split into one band per
+             segment, and the CoACD collision pieces it was decomposed into. -->
+        <texture name="shepherd_plant" type="2d" file="assets/plants/shepherd/shepherd_plant.png"/>
+        <material name="shepherd_plant" texture="shepherd_plant" specular="0.1" shininess="0.1"/>
+        <mesh name="shepherd_band_0" file="../../../../application/field_description/assets/plants/shepherd/bands/shepherd_band_0.obj"/>
+        <mesh name="shepherd_band_1" file="../../../../application/field_description/assets/plants/shepherd/bands/shepherd_band_1.obj"/>
+        <mesh name="shepherd_band_2" file="../../../../application/field_description/assets/plants/shepherd/bands/shepherd_band_2.obj"/>
+        <mesh name="shepherd_band_3" file="../../../../application/field_description/assets/plants/shepherd/bands/shepherd_band_3.obj"/>
+        <mesh name="shepherd_col_0" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_0.obj"/>
+        <mesh name="shepherd_col_1" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_1.obj"/>
+        <mesh name="shepherd_col_2" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_2.obj"/>
+        <mesh name="shepherd_col_3" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_3.obj"/>
+        <mesh name="shepherd_col_4" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_4.obj"/>
+        <mesh name="shepherd_col_5" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_5.obj"/>
+        <mesh name="shepherd_col_6" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_6.obj"/>
+        <mesh name="shepherd_col_7" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_7.obj"/>
+        <mesh name="shepherd_col_8" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_8.obj"/>
+        <mesh name="shepherd_col_9" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_9.obj"/>
+        <mesh name="shepherd_col_10" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_10.obj"/>
+        <mesh name="shepherd_col_11" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_11.obj"/>
+        <mesh name="shepherd_col_12" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_12.obj"/>
+        <mesh name="shepherd_col_13" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_13.obj"/>
+        <mesh name="shepherd_col_14" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_14.obj"/>
+        <mesh name="shepherd_col_15" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_15.obj"/>
+        <mesh name="shepherd_col_16" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_16.obj"/>
+        <mesh name="shepherd_col_17" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_17.obj"/>
+        <mesh name="shepherd_col_18" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_18.obj"/>
+        <mesh name="shepherd_col_19" file="../../../../application/field_description/assets/plants/shepherd/collision/shepherd_col_19.obj"/>
+    </asset>
+
+    <default>
+        <default class="weed_visual">
+            <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+        </default>
+        <!-- condim=4 adds torsional friction, so a gripped stem cannot spin free. -->
+        <default class="weed_collision">
+            <geom type="mesh" group="3" condim="4" friction="1.5 0.02 0.001"/>
+        </default>
+        <!-- Stiff enough to stand up under its own weight, soft enough to be pushed
+             aside. The armature is what sets the sway: the segments' own inertia is
+             so small that stiffness alone would put the stalk at 27 Hz, which reads
+             as a twitch rather than a plant. Added inertia drops that to ~3 Hz, and
+             the damping is then a fraction of critical so the stalk swings past
+             upright a few times before settling, the way a real stem does.
+             The travel limit matters as much: three joints free to turn 69 deg each
+             let the plant fold flat and drop its own tip 20 cm, which turns any
+             sideways drag into an upward one. 29 deg each keeps it a bend. -->
+        <default class="stalk">
+            <joint type="hinge" stiffness="0.05" damping="8e-4" armature="1.4e-4"
+                   range="-0.5 0.5" limited="true"/>
+        </default>
+    </default>
+
+    <worldbody>
+        <body name="sowthistle_1" pos="-0.35 -0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
+            <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <geom class="weed_collision" mesh="sowthistle_col_4"/>
+            <geom class="weed_collision" mesh="sowthistle_col_9"/>
+            <geom class="weed_collision" mesh="sowthistle_col_32"/>
+            <geom class="weed_collision" mesh="sowthistle_col_35"/>
+            <geom class="weed_collision" mesh="sowthistle_col_36"/>
+            <body name="sowthistle_1_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0233" mass="0.0037" diaginertia="6.81e-07 6.81e-07 2.27e-07"/>
+                <geom class="weed_visual" mesh="sowthistle_band_1" material="sowthistle_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_3" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_6" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_10" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_15" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_16" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_17" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_21" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_22" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_25" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_26" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_27" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_30" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_31" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_34" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_37" pos="0 0 -0.0400"/>
+                <body name="sowthistle_1_s2" pos="0 0 0.0467">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0233" mass="0.0030" diaginertia="5.44e-07 5.44e-07 1.81e-07"/>
+                    <geom class="weed_visual" mesh="sowthistle_band_2" material="sowthistle_plant" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_1" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_2" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_11" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_12" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_14" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_18" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_20" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_23" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_24" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_28" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_29" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_38" pos="0 0 -0.0867"/>
+                    <body name="sowthistle_1_s3" pos="0 0 0.0467">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0233" mass="0.0022" diaginertia="4.08e-07 4.08e-07 1.36e-07"/>
+                        <geom class="weed_visual" mesh="sowthistle_band_3" material="sowthistle_plant" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_0" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_5" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_7" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_8" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_13" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_19" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_33" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_39" pos="0 0 -0.1333"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="sowthistle_2" pos="0.45 -0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
+            <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <geom class="weed_collision" mesh="sowthistle_col_4"/>
+            <geom class="weed_collision" mesh="sowthistle_col_9"/>
+            <geom class="weed_collision" mesh="sowthistle_col_32"/>
+            <geom class="weed_collision" mesh="sowthistle_col_35"/>
+            <geom class="weed_collision" mesh="sowthistle_col_36"/>
+            <body name="sowthistle_2_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0233" mass="0.0037" diaginertia="6.81e-07 6.81e-07 2.27e-07"/>
+                <geom class="weed_visual" mesh="sowthistle_band_1" material="sowthistle_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_3" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_6" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_10" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_15" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_16" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_17" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_21" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_22" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_25" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_26" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_27" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_30" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_31" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_34" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_37" pos="0 0 -0.0400"/>
+                <body name="sowthistle_2_s2" pos="0 0 0.0467">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0233" mass="0.0030" diaginertia="5.44e-07 5.44e-07 1.81e-07"/>
+                    <geom class="weed_visual" mesh="sowthistle_band_2" material="sowthistle_plant" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_1" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_2" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_11" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_12" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_14" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_18" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_20" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_23" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_24" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_28" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_29" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_38" pos="0 0 -0.0867"/>
+                    <body name="sowthistle_2_s3" pos="0 0 0.0467">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0233" mass="0.0022" diaginertia="4.08e-07 4.08e-07 1.36e-07"/>
+                        <geom class="weed_visual" mesh="sowthistle_band_3" material="sowthistle_plant" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_0" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_5" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_7" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_8" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_13" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_19" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_33" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_39" pos="0 0 -0.1333"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="sowthistle_3" pos="-0.35 0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
+            <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <geom class="weed_collision" mesh="sowthistle_col_4"/>
+            <geom class="weed_collision" mesh="sowthistle_col_9"/>
+            <geom class="weed_collision" mesh="sowthistle_col_32"/>
+            <geom class="weed_collision" mesh="sowthistle_col_35"/>
+            <geom class="weed_collision" mesh="sowthistle_col_36"/>
+            <body name="sowthistle_3_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0233" mass="0.0037" diaginertia="6.81e-07 6.81e-07 2.27e-07"/>
+                <geom class="weed_visual" mesh="sowthistle_band_1" material="sowthistle_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_3" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_6" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_10" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_15" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_16" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_17" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_21" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_22" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_25" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_26" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_27" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_30" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_31" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_34" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_37" pos="0 0 -0.0400"/>
+                <body name="sowthistle_3_s2" pos="0 0 0.0467">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0233" mass="0.0030" diaginertia="5.44e-07 5.44e-07 1.81e-07"/>
+                    <geom class="weed_visual" mesh="sowthistle_band_2" material="sowthistle_plant" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_1" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_2" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_11" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_12" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_14" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_18" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_20" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_23" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_24" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_28" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_29" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_38" pos="0 0 -0.0867"/>
+                    <body name="sowthistle_3_s3" pos="0 0 0.0467">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0233" mass="0.0022" diaginertia="4.08e-07 4.08e-07 1.36e-07"/>
+                        <geom class="weed_visual" mesh="sowthistle_band_3" material="sowthistle_plant" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_0" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_5" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_7" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_8" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_13" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_19" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_33" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_39" pos="0 0 -0.1333"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="sowthistle_4" pos="1.25 0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
+            <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <geom class="weed_collision" mesh="sowthistle_col_4"/>
+            <geom class="weed_collision" mesh="sowthistle_col_9"/>
+            <geom class="weed_collision" mesh="sowthistle_col_32"/>
+            <geom class="weed_collision" mesh="sowthistle_col_35"/>
+            <geom class="weed_collision" mesh="sowthistle_col_36"/>
+            <body name="sowthistle_4_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0233" mass="0.0037" diaginertia="6.81e-07 6.81e-07 2.27e-07"/>
+                <geom class="weed_visual" mesh="sowthistle_band_1" material="sowthistle_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_3" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_6" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_10" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_15" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_16" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_17" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_21" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_22" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_25" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_26" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_27" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_30" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_31" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_34" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="sowthistle_col_37" pos="0 0 -0.0400"/>
+                <body name="sowthistle_4_s2" pos="0 0 0.0467">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0233" mass="0.0030" diaginertia="5.44e-07 5.44e-07 1.81e-07"/>
+                    <geom class="weed_visual" mesh="sowthistle_band_2" material="sowthistle_plant" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_1" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_2" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_11" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_12" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_14" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_18" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_20" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_23" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_24" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_28" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_29" pos="0 0 -0.0867"/>
+                    <geom class="weed_collision" mesh="sowthistle_col_38" pos="0 0 -0.0867"/>
+                    <body name="sowthistle_4_s3" pos="0 0 0.0467">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0233" mass="0.0022" diaginertia="4.08e-07 4.08e-07 1.36e-07"/>
+                        <geom class="weed_visual" mesh="sowthistle_band_3" material="sowthistle_plant" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_0" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_5" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_7" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_8" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_13" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_19" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_33" pos="0 0 -0.1333"/>
+                        <geom class="weed_collision" mesh="sowthistle_col_39" pos="0 0 -0.1333"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="shepherd_1" pos="0.20 -0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
+            <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <geom class="weed_collision" mesh="shepherd_col_0"/>
+            <geom class="weed_collision" mesh="shepherd_col_1"/>
+            <geom class="weed_collision" mesh="shepherd_col_7"/>
+            <geom class="weed_collision" mesh="shepherd_col_12"/>
+            <geom class="weed_collision" mesh="shepherd_col_13"/>
+            <geom class="weed_collision" mesh="shepherd_col_14"/>
+            <geom class="weed_collision" mesh="shepherd_col_15"/>
+            <body name="shepherd_1_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0133" mass="0.0020" diaginertia="1.19e-07 1.19e-07 3.95e-08"/>
+                <geom class="weed_visual" mesh="shepherd_band_1" material="shepherd_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_5" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_6" pos="0 0 -0.0400"/>
+                <body name="shepherd_1_s2" pos="0 0 0.0267">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0133" mass="0.0016" diaginertia="9.48e-08 9.48e-08 3.16e-08"/>
+                    <geom class="weed_visual" mesh="shepherd_band_2" material="shepherd_plant" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_2" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_3" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_4" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_9" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_10" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_11" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_16" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_19" pos="0 0 -0.0667"/>
+                    <body name="shepherd_1_s3" pos="0 0 0.0267">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0133" mass="0.0012" diaginertia="7.11e-08 7.11e-08 2.37e-08"/>
+                        <geom class="weed_visual" mesh="shepherd_band_3" material="shepherd_plant" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_8" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_17" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_18" pos="0 0 -0.0933"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="shepherd_2" pos="1.85 -0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
+            <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <geom class="weed_collision" mesh="shepherd_col_0"/>
+            <geom class="weed_collision" mesh="shepherd_col_1"/>
+            <geom class="weed_collision" mesh="shepherd_col_7"/>
+            <geom class="weed_collision" mesh="shepherd_col_12"/>
+            <geom class="weed_collision" mesh="shepherd_col_13"/>
+            <geom class="weed_collision" mesh="shepherd_col_14"/>
+            <geom class="weed_collision" mesh="shepherd_col_15"/>
+            <body name="shepherd_2_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0133" mass="0.0020" diaginertia="1.19e-07 1.19e-07 3.95e-08"/>
+                <geom class="weed_visual" mesh="shepherd_band_1" material="shepherd_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_5" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_6" pos="0 0 -0.0400"/>
+                <body name="shepherd_2_s2" pos="0 0 0.0267">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0133" mass="0.0016" diaginertia="9.48e-08 9.48e-08 3.16e-08"/>
+                    <geom class="weed_visual" mesh="shepherd_band_2" material="shepherd_plant" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_2" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_3" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_4" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_9" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_10" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_11" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_16" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_19" pos="0 0 -0.0667"/>
+                    <body name="shepherd_2_s3" pos="0 0 0.0267">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0133" mass="0.0012" diaginertia="7.11e-08 7.11e-08 2.37e-08"/>
+                        <geom class="weed_visual" mesh="shepherd_band_3" material="shepherd_plant" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_8" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_17" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_18" pos="0 0 -0.0933"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="shepherd_3" pos="-1.20 0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
+            <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <geom class="weed_collision" mesh="shepherd_col_0"/>
+            <geom class="weed_collision" mesh="shepherd_col_1"/>
+            <geom class="weed_collision" mesh="shepherd_col_7"/>
+            <geom class="weed_collision" mesh="shepherd_col_12"/>
+            <geom class="weed_collision" mesh="shepherd_col_13"/>
+            <geom class="weed_collision" mesh="shepherd_col_14"/>
+            <geom class="weed_collision" mesh="shepherd_col_15"/>
+            <body name="shepherd_3_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0133" mass="0.0020" diaginertia="1.19e-07 1.19e-07 3.95e-08"/>
+                <geom class="weed_visual" mesh="shepherd_band_1" material="shepherd_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_5" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_6" pos="0 0 -0.0400"/>
+                <body name="shepherd_3_s2" pos="0 0 0.0267">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0133" mass="0.0016" diaginertia="9.48e-08 9.48e-08 3.16e-08"/>
+                    <geom class="weed_visual" mesh="shepherd_band_2" material="shepherd_plant" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_2" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_3" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_4" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_9" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_10" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_11" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_16" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_19" pos="0 0 -0.0667"/>
+                    <body name="shepherd_3_s3" pos="0 0 0.0267">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0133" mass="0.0012" diaginertia="7.11e-08 7.11e-08 2.37e-08"/>
+                        <geom class="weed_visual" mesh="shepherd_band_3" material="shepherd_plant" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_8" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_17" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_18" pos="0 0 -0.0933"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="shepherd_4" pos="0.55 0.50 0.10">
+            <freejoint/>
+            <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
+            <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <geom class="weed_collision" mesh="shepherd_col_0"/>
+            <geom class="weed_collision" mesh="shepherd_col_1"/>
+            <geom class="weed_collision" mesh="shepherd_col_7"/>
+            <geom class="weed_collision" mesh="shepherd_col_12"/>
+            <geom class="weed_collision" mesh="shepherd_col_13"/>
+            <geom class="weed_collision" mesh="shepherd_col_14"/>
+            <geom class="weed_collision" mesh="shepherd_col_15"/>
+            <body name="shepherd_4_s1" pos="0 0 0.0400">
+                <joint class="stalk" axis="1 0 0"/>
+                <joint class="stalk" axis="0 1 0"/>
+                <inertial pos="0 0 0.0133" mass="0.0020" diaginertia="1.19e-07 1.19e-07 3.95e-08"/>
+                <geom class="weed_visual" mesh="shepherd_band_1" material="shepherd_plant" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_5" pos="0 0 -0.0400"/>
+                <geom class="weed_collision" mesh="shepherd_col_6" pos="0 0 -0.0400"/>
+                <body name="shepherd_4_s2" pos="0 0 0.0267">
+                    <joint class="stalk" axis="1 0 0"/>
+                    <joint class="stalk" axis="0 1 0"/>
+                    <inertial pos="0 0 0.0133" mass="0.0016" diaginertia="9.48e-08 9.48e-08 3.16e-08"/>
+                    <geom class="weed_visual" mesh="shepherd_band_2" material="shepherd_plant" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_2" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_3" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_4" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_9" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_10" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_11" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_16" pos="0 0 -0.0667"/>
+                    <geom class="weed_collision" mesh="shepherd_col_19" pos="0 0 -0.0667"/>
+                    <body name="shepherd_4_s3" pos="0 0 0.0267">
+                        <joint class="stalk" axis="1 0 0"/>
+                        <joint class="stalk" axis="0 1 0"/>
+                        <inertial pos="0 0 0.0133" mass="0.0012" diaginertia="7.11e-08 7.11e-08 2.37e-08"/>
+                        <geom class="weed_visual" mesh="shepherd_band_3" material="shepherd_plant" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_8" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_17" pos="0 0 -0.0933"/>
+                        <geom class="weed_collision" mesh="shepherd_col_18" pos="0 0 -0.0933"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+
+    <equality>
+        <weld name="sowthistle_1_root" body1="sowthistle_1" anchor="-0.35 -0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+        <weld name="sowthistle_2_root" body1="sowthistle_2" anchor="0.45 -0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+        <weld name="sowthistle_3_root" body1="sowthistle_3" anchor="-0.35 0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+        <weld name="sowthistle_4_root" body1="sowthistle_4" anchor="1.25 0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+        <weld name="shepherd_1_root" body1="shepherd_1" anchor="0.20 -0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+        <weld name="shepherd_2_root" body1="shepherd_2" anchor="1.85 -0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+        <weld name="shepherd_3_root" body1="shepherd_3" anchor="-1.20 0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+        <weld name="shepherd_4_root" body1="shepherd_4" anchor="0.55 0.50 0.10"
+              solref="0.01 1" solimp="0.95 0.99 0.001"/>
+    </equality>
+
+</mujoco>

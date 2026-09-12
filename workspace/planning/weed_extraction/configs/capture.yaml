@@ -1,0 +1,9 @@
+# Headless: settle the robot, then save one frame per camera to output_dir.
+# Colour -> PNG; depth -> .npy (metres) plus a colour-mapped PNG preview.
+mode: capture
+cameras: [rgb_camera, d435i_color, d435i_depth]
+width: 1280
+height: 720
+base_x: 0.0
+settle_s: 2.0
+output_dir: outputs

@@ -1,0 +1,197 @@
+"""Gymnasium environment for the mobile Panda in the weed field."""
+
+from pathlib import Path
+
+import gymnasium as gym
+import mujoco
+import numpy as np
+
+SCENE = (
+    Path(__file__).resolve().parents[3]
+    / "application"
+    / "field_description"
+    / "scene_mobile_field.xml"
+)
+
+ROOT_BREAK_FORCE = 15.0  # newtons; a small annual weed pulls out at roughly 5-30 N
+
+
+def reset_to_home(model, data):
+    """Robot to its home keyframe, weeds to their planted pose.
+
+    The keyframe describes the robot only, and MuJoCo pads it with zeros for the
+    weeds' free joints, which would teleport them all to the origin.
+    """
+    key = model.key("home").id
+    rows = model.jnt_qposadr[model.jnt_type != mujoco.mjtJoint.mjJNT_FREE]
+    mujoco.mj_resetData(model, data)
+    data.qpos[rows] = model.key_qpos[key][rows]
+    data.ctrl[:] = model.key_ctrl[key]
+    mujoco.mj_forward(model, data)
+
+
+class Roots:
+    """The weeds' breakable root welds.
+
+    MuJoCo equalities have no break force, so a weed is released from here instead.
+    Two rules make that behave like a real root:
+
+    Only the pull along the plant's own axis counts. A root resists being drawn out
+    of the soil; a sideways load bends the stalk and, in a real plant, would lodge or
+    snap it rather than extract it. Taking the whole force magnitude would let a purely
+    horizontal shove uproot the plant.
+
+    The load has to be sustained, not instantaneous. A root fails under a pull that is
+    held, and this also ignores the single-step force spikes that a stiff contact or a
+    stiff drag spring can throw into the solver.
+    """
+
+    SUSTAIN = 0.02  # seconds the pull must be held before the root gives way
+
+    def __init__(self, model):
+        self.model = model
+        self.eqs = [i for i in range(model.neq) if (model.eq(i).name or "").endswith("_root")]
+        self.base = {i: model.body(model.eq(i).name.removesuffix("_root")).id for i in self.eqs}
+        # Grabbing a plant anywhere pulls on the same root, so map its whole subtree.
+        self.of_body = {b: i for i in self.eqs for b in range(model.nbody)
+                        if model.body_rootid[b] == self.base[i]}
+        # The direction the plant was planted in, taken once from the model. It must
+        # not follow the body: a plant that has been bent over would otherwise count
+        # a sideways pull as axial, and could be uprooted from any direction.
+        self.up = {}
+        for eq in self.eqs:
+            rot = np.zeros(9)
+            mujoco.mju_quat2Mat(rot, model.body_quat[self.base[eq]])
+            self.up[eq] = rot.reshape(3, 3)[:, 2]
+        self._overloaded_since = {}
+
+    def forget(self):
+        """Drop the overload timers; call when the simulation is reset."""
+        self._overloaded_since.clear()
+
+    def holds(self, body_id, data):
+        """The root still anchoring this body, or None if it is loose or not a weed."""
+        eq = self.of_body.get(body_id)
+        return eq if eq is not None and data.eq_active[eq] else None
+
+    def axial_force(self, data, eq):
+        """Newtons drawing the weed out of the soil along its own axis.
+
+        Sideways load is excluded, and so is downward: pressing a plant into the
+        ground is not a way to uproot it.
+        """
+        n = data.nefc
+        is_eq = data.efc_type[:n] == mujoco.mjtConstraint.mjCNSTR_EQUALITY
+        rows = np.flatnonzero(is_eq & (data.efc_id[:n] == eq))[:3]  # the weld's force rows
+        if len(rows) < 3:
+            return 0.0
+        # efc_force is the constraint's reaction, so it opposes the pull: an upward
+        # pull shows as a downward reaction, hence the sign.
+        return max(0.0, -float(np.dot(data.efc_force[rows], self.up[eq])))
+
+    def snap(self, data, threshold=ROOT_BREAK_FORCE):
+        """Release weeds pulled past `threshold` for long enough, and name them."""
+        gave_way = []
+        for eq in self.eqs:
+            if not data.eq_active[eq]:
+                continue
+            if self.axial_force(data, eq) <= threshold:
+                self._overloaded_since.pop(eq, None)
+                continue
+            since = self._overloaded_since.setdefault(eq, data.time)
+            if since > data.time:  # the clock was rewound by a reset
+                since = self._overloaded_since[eq] = data.time
+            if data.time - since >= self.SUSTAIN:
+                data.eq_active[eq] = 0
+                gave_way.append(self.model.eq(eq).name.removesuffix("_root"))
+        return gave_way
+
+
+class WeedExtractionEnv(gym.Env):
+    """Action: absolute targets for the 9 actuators (7 arm joints, gripper 0-255, base x in m).
+
+    Observation: joint positions and velocities, plus one image per camera. Cameras whose
+    name ends in "_depth" give float32 depth in metres; the rest give uint8 RGB.
+    Reward is 0; no task is defined yet. info["uprooted"] names the weeds torn loose on
+    that step.
+    """
+
+    metadata = {"render_modes": ["rgb_array"], "render_fps": 20}
+
+    def __init__(
+        self,
+        scene=SCENE,
+        cameras=("d435i_color",),
+        width=640,
+        height=360,
+        control_hz=20,
+        max_steps=500,
+        render_mode=None,
+    ):
+        self.model = mujoco.MjModel.from_xml_path(str(scene))
+        self.data = mujoco.MjData(self.model)
+        self.cameras = list(cameras)
+        self.render_mode = render_mode
+        self.max_steps = max_steps
+        self.n_substeps = round(1 / (control_hz * self.model.opt.timestep))
+        self.roots = Roots(self.model)
+        self.width, self.height = width, height
+        self._renderer = None  # built on demand: no cameras means no GL context
+
+        # The offscreen buffer must be at least as large as the requested images.
+        vis = self.model.vis.global_
+        vis.offwidth, vis.offheight = max(width, vis.offwidth), max(height, vis.offheight)
+
+        ctrl = self.model.actuator_ctrlrange.astype(np.float32)
+        self.action_space = gym.spaces.Box(ctrl[:, 0], ctrl[:, 1], dtype=np.float32)
+        spaces = {
+            "qpos": gym.spaces.Box(-np.inf, np.inf, (self.model.nq,), np.float64),
+            "qvel": gym.spaces.Box(-np.inf, np.inf, (self.model.nv,), np.float64),
+        }
+        for cam in self.cameras:
+            if cam.endswith("_depth"):
+                spaces[cam] = gym.spaces.Box(0, np.inf, (height, width), np.float32)
+            else:
+                spaces[cam] = gym.spaces.Box(0, 255, (height, width, 3), np.uint8)
+        self.observation_space = gym.spaces.Dict(spaces)
+
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+        reset_to_home(self.model, self.data)
+        self.roots.forget()
+        self._steps = 0
+        return self.get_obs(), {}
+
+    def step(self, action):
+        self.data.ctrl[:] = np.clip(action, self.action_space.low, self.action_space.high)
+        mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        uprooted = self.roots.snap(self.data)
+        self._steps += 1
+        return (self.get_obs(), 0.0, False, self._steps >= self.max_steps,
+                {"uprooted": uprooted})
+
+    def get_obs(self):
+        obs = {"qpos": self.data.qpos.copy(), "qvel": self.data.qvel.copy()}
+        for cam in self.cameras:
+            obs[cam] = self._render(cam, depth=cam.endswith("_depth"))
+        return obs
+
+    def render(self):
+        if self.render_mode == "rgb_array":
+            return self._render("rgb_camera")
+
+    def close(self):
+        if self._renderer is not None:
+            self._renderer.close()
+            self._renderer = None
+
+    def _render(self, camera, depth=False):
+        if self._renderer is None:
+            self._renderer = mujoco.Renderer(self.model, self.height, self.width)
+        if depth:
+            self._renderer.enable_depth_rendering()
+        self._renderer.update_scene(self.data, camera=camera)
+        image = self._renderer.render()
+        if depth:
+            self._renderer.disable_depth_rendering()
+        return image

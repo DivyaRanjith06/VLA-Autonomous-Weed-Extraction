@@ -1,0 +1,3 @@
+# Interactive viewer. Ctrl+right-drag a weed to pull it out of the soil.
+mode: view
+base_x: 0.0

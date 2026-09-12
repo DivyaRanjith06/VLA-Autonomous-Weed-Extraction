@@ -1,0 +1,9 @@
+[submodule "workspace/hardware/mujoco_menagerie"]
+	path = workspace/hardware/mujoco_menagerie
+	url = https://github.com/google-deepmind/mujoco_menagerie.git
+[submodule "workspace/planning/lerobot"]
+	path = workspace/planning/lerobot
+	url = https://github.com/huggingface/lerobot.git
+[submodule "workspace/hardware/realsense-ros"]
+	path = workspace/hardware/realsense-ros
+	url = https://github.com/realsenseai/realsense-ros.git

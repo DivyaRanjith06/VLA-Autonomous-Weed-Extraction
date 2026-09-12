@@ -1,0 +1,246 @@
+<mujoco model="mobile panda strawberry field">
+
+    <!--
+      The active scene: mobile-base Panda, two crop beds, strawberries as the crop
+      and two weed species that can be pulled out.
+
+      Asset-path note: mobile_panda.xml sets a global `meshdir` (the Franka mesh
+      folder), and MuJoCo prepends it to every *relative* mesh path, so the plant
+      meshes below are written relative to that `meshdir` (four levels up =
+      workspace/). The scene then compiles from any working directory.
+    -->
+
+    <!-- ========================= -->
+    <!-- ROBOT (mobile base + Panda arm) -->
+    <!-- ========================= -->
+
+    <include file="../../hardware/panda_description/mobile_panda.xml"/>
+    <include file="weeds.xml"/>
+
+
+    <!-- ========================= -->
+    <!-- PLANT MESHES -->
+    <!-- ========================= -->
+
+    <asset>
+        <!-- Textured strawberry plant, converted from source/strawberry_plant.glb
+             (Z-up, metres, 0.22 m tall). Texture paths are relative to this file. -->
+        <mesh name="strawberry_mesh"
+              file="../../../../application/field_description/assets/plants/strawberry/strawberry_plant.obj"/>
+        <texture name="strawberry_plant" type="2d"
+                 file="assets/plants/strawberry/strawberry_plant.png"/>
+        <material name="strawberry_plant" texture="strawberry_plant"
+                  specular="0.1" shininess="0.1"/>
+    </asset>
+
+
+    <!-- Elliptic cones and a high impratio stop a gripped stem sliding out of the
+         fingers; 1 ms keeps the small contacts stable.
+
+         No air: MuJoCo's fluid model costs 17% of the step and, measured over a 30 cm
+         drop, changes neither the fall time nor the tumble. Note that joint damping is
+         not an alternative: one number covers all six degrees of freedom of a free
+         joint, and any value big enough to slow a fall dwarfs a plant's rotational
+         inertia, so the plant stops tumbling and sinks upright instead of falling. -->
+    <option timestep="0.001" cone="elliptic" impratio="10"/>
+
+
+    <!-- ========================= -->
+    <!-- VISUAL SETTINGS -->
+    <!-- ========================= -->
+
+    <visual>
+
+        <!-- Ambient is deliberately low. Fill light is what washes shadows out: at
+             the stock 0.25 headlight + 0.35 sun, a surface in full shadow still
+             received 60% of the light and the plants cast nothing you could read.
+             The sun's diffuse is raised to make up the loss. -->
+        <headlight
+            diffuse="0.35 0.35 0.35"
+            ambient="0.10 0.10 0.10"
+            specular="0.1 0.1 0.1"/>
+
+        <!-- 4096 over a 6 m scene smears a leaf's shadow into a blob. -->
+        <quality
+            shadowsize="8192"/>
+
+        <rgba
+            haze="0.92 0.96 1.0 1"/>
+
+        <global
+            azimuth="145"
+            elevation="-25"/>
+
+    </visual>
+
+
+    <!-- ========================= -->
+    <!-- ENVIRONMENT ASSETS -->
+    <!-- ========================= -->
+
+    <asset>
+
+        <!-- Sky -->
+        <texture
+            type="skybox"
+            builtin="gradient"
+            rgb1="0.65 0.82 0.95"
+            rgb2="0.95 0.98 1.0"
+            width="512"
+            height="3072"/>
+
+
+        <!-- Grass for the walking path, bare soil for the crop beds -->
+        <texture
+            name="grass"
+            type="2d"
+            file="assets/ground/sparse_grass_diff_4k.png"/>
+
+        <material
+            name="grass"
+            texture="grass"
+            texuniform="true"
+            texrepeat="2 2"
+            reflectance="0"
+            shininess="0"
+            specular="0"/>
+
+        <texture
+            name="soil"
+            type="2d"
+            file="assets/ground/brown_mud_03_diff_2k.png"/>
+
+        <material
+            name="soil"
+            texture="soil"
+            texuniform="true"
+            texrepeat="4 4"
+            reflectance="0"
+            shininess="0"
+            specular="0"/>
+
+    </asset>
+
+
+    <!-- ========================= -->
+    <!-- WORLD -->
+    <!-- ========================= -->
+
+    <worldbody>
+
+
+        <!-- SUN -->
+        <light
+            name="sun"
+            directional="true"
+            pos="0 0 5"
+            dir="-0.4 -0.3 -1"
+            diffuse="1.2 1.16 1.08"
+            ambient="0.12 0.12 0.12"
+            specular="0.1 0.1 0.1"
+            castshadow="true"/>
+
+
+        <!-- ========================= -->
+        <!-- WALKING PATH -->
+        <!-- ========================= -->
+
+        <geom
+            name="path"
+            type="plane"
+            pos="0 0 -0.02"
+            size="8 8 0.1"
+            material="grass"/>
+
+
+        <!-- ========================= -->
+        <!-- RAISED BED 1 -->
+        <!-- ========================= -->
+
+        <geom
+            name="bed1"
+            type="box"
+            pos="0.80 -0.50 0.05"
+            size="2.5 0.35 0.05"
+            friction="0.7 0.005 0.0001"
+            material="soil"/>
+
+
+        <!-- ========================= -->
+        <!-- RAISED BED 2 -->
+        <!-- ========================= -->
+
+        <geom
+            name="bed2"
+            type="box"
+            pos="0.80 0.50 0.05"
+            size="2.5 0.35 0.05"
+            friction="0.7 0.005 0.0001"
+            material="soil"/>
+
+
+        <!-- ================================================= -->
+        <!-- STRAWBERRIES — BED 1 -->
+        <!-- ================================================= -->
+
+        <body name="strawberry_1" pos="-0.80 -0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+        <body name="strawberry_2" pos="0.00 -0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+        <body name="strawberry_3" pos="0.80 -0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+        <body name="strawberry_4" pos="1.60 -0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+
+        <!-- ================================================= -->
+        <!-- STRAWBERRIES — BED 2 -->
+        <!-- ================================================= -->
+
+        <body name="strawberry_5" pos="-0.80 0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+        <body name="strawberry_6" pos="0.00 0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+        <body name="strawberry_7" pos="0.80 0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+        <body name="strawberry_8" pos="1.60 0.50 0.10">
+            <geom type="mesh" mesh="strawberry_mesh"
+                  material="strawberry_plant"/>
+        </body>
+
+
+        <!-- ========================= -->
+        <!-- CAMERA -->
+        <!-- ========================= -->
+
+        <camera
+            name="rgb_camera"
+            mode="track"
+            target="link0"
+            pos="1.4 -0.8 0.9"
+            xyaxes="0.580 0.814 0 -0.319 0.228 0.920"/>
+
+    </worldbody>
+
+
+</mujoco>
