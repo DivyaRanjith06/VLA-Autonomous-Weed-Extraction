@@ -18,19 +18,19 @@
       <default class="collision">
         <geom type="mesh" group="3"/>
         <default class="fingertip_pad_collision_1">
-          <geom type="box" size="0.0085 0.004 0.0085" pos="0 0.0055 0.0445"/>
+          <geom type="box" size="0.0085 0.004 0.0085" pos="0 0.0055 0.0445" contype="2" conaffinity="2"/>
         </default>
         <default class="fingertip_pad_collision_2">
-          <geom type="box" size="0.003 0.002 0.003" pos="0.0055 0.002 0.05"/>
+          <geom type="box" size="0.003 0.002 0.003" pos="0.0055 0.002 0.05" contype="2" conaffinity="2"/>
         </default>
         <default class="fingertip_pad_collision_3">
-          <geom type="box" size="0.003 0.002 0.003" pos="-0.0055 0.002 0.05"/>
+          <geom type="box" size="0.003 0.002 0.003" pos="-0.0055 0.002 0.05" contype="2" conaffinity="2"/>
         </default>
         <default class="fingertip_pad_collision_4">
-          <geom type="box" size="0.003 0.002 0.0035" pos="0.0055 0.002 0.0395"/>
+          <geom type="box" size="0.003 0.002 0.0035" pos="0.0055 0.002 0.0395" contype="2" conaffinity="2"/>
         </default>
         <default class="fingertip_pad_collision_5">
-          <geom type="box" size="0.003 0.002 0.0035" pos="-0.0055 0.002 0.0395"/>
+          <geom type="box" size="0.003 0.002 0.0035" pos="-0.0055 0.002 0.0395" contype="2" conaffinity="2"/>
         </default>
       </default>
     </default>
@@ -241,6 +241,9 @@
                       <geom mesh="hand_3" material="white" class="visual"/>
                       <geom mesh="hand_4" material="off_white" class="visual"/>
                       <geom mesh="hand_c" class="collision"/>
+                      <!-- What IK aims at: the Franka TCP, midway between the closed
+                           fingertip pads, with +z along the gripper approach axis. -->
+                      <site name="grasp_site" pos="0 0 0.1034" size="0.001" group="4"/>
                       <!-- Wrist RealSense D435i on the hand's +x face, looking along the
                            gripper approach axis (hand +z). Body frame = menagerie mesh frame:
                            long side along x, lens face at z=0 looking +z. Lens offsets follow
@@ -266,7 +269,11 @@
                         <joint name="finger_joint1" class="finger"/>
                         <geom mesh="finger_0" material="off_white" class="visual"/>
                         <geom mesh="finger_1" material="black" class="visual"/>
-                        <geom mesh="finger_0" class="collision"/>
+                        <!-- Shaft is visual only; the pads below are what touches
+                             things. The 14x10x37 mm shaft is what ploughs through a
+                             plant on the way in, burying itself several mm in leaf
+                             geometry before the pads ever reach the stem. -->
+                        <geom mesh="finger_0" class="collision" contype="0" conaffinity="0"/>
                         <geom class="fingertip_pad_collision_1"/>
                         <geom class="fingertip_pad_collision_2"/>
                         <geom class="fingertip_pad_collision_3"/>
@@ -278,7 +285,11 @@
                         <joint name="finger_joint2" class="finger"/>
                         <geom mesh="finger_0" material="off_white" class="visual"/>
                         <geom mesh="finger_1" material="black" class="visual"/>
-                        <geom mesh="finger_0" class="collision"/>
+                        <!-- Shaft is visual only; the pads below are what touches
+                             things. The 14x10x37 mm shaft is what ploughs through a
+                             plant on the way in, burying itself several mm in leaf
+                             geometry before the pads ever reach the stem. -->
+                        <geom mesh="finger_0" class="collision" contype="0" conaffinity="0"/>
                         <geom class="fingertip_pad_collision_1"/>
                         <geom class="fingertip_pad_collision_2"/>
                         <geom class="fingertip_pad_collision_3"/>

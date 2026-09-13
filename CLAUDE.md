@@ -116,7 +116,9 @@ VLA-Weed-Extraction/
 ├── CLAUDE.md                 this file
 ├── Dockerfile                Ubuntu 24.04 + ROS 2 Jazzy, MuJoCo + LeRobot
 ├── docs/scene.png            README screenshot
-├── run_scripts/simulate.sh   launcher; works natively and inside the container
+├── run_scripts/
+│   ├── simulate.sh           launcher; works natively and inside the container
+│   └── test_up_root.sh       scripted grasp-twist-pull demo in the viewer
 ├── docker_scripts/run_scripts/   build, base, devel, up, enter_bash, stop
 └── workspace/
     ├── hardware/
@@ -135,9 +137,9 @@ VLA-Weed-Extraction/
     └── planning/
         ├── lerobot/                  submodule @ bad0260 (v0.6.1)
         └── weed_extraction/
-            ├── weed_extraction/{__init__,env,launch}.py
-            ├── configs/{view,capture}.yaml
-            └── tests/{test_scene,test_env}.py
+            ├── weed_extraction/{__init__,env,ik,launch,uproot}.py
+            ├── configs/{view,capture,uproot}.yaml
+            └── tests/{test_scene,test_env,test_ik,test_uproot}.py
 ```
 
 ### Active scene: `workspace/application/field_description/scene_mobile_field.xml`
@@ -162,7 +164,10 @@ Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-pe
 | Gymnasium env | Works. `WeedExtraction-v0`, `info["uprooted"]` names weeds torn loose. No task defined. |
 | Launcher | Works. `weed-launch view` / `capture`, or `run_scripts/simulate.sh`. |
 | Interactive uprooting | Works. Ctrl+right-drag pulls a weed out at 28 mm of travel from any grab point. |
-| Test suite | 14 tests pass. |
+| Collision-aware IK (M7) | Works. mink differential IK on a plant-free copy of the scene; 7 iterations and 0.003 mm to a reachable pose, ~0.25 ms per solve. Keeps the arm off the beds, the ground and its own shoulder. |
+| Root torsion | Works. Pull and twist share one linear failure criterion, so twisting a weed loose takes less pull than hauling it out. |
+| Scripted extraction (M8-M9) | Works. Side grasp at 40 deg off the stalk's axis, 14 mm up; turn 10 deg about the world vertical, then lift. Out at 11.8 s on 57% pull and 67% twist -- neither alone is enough. The plant never enters the gripper by more than 0.33 mm and drops the instant the jaws open. |
+| Test suite | 31 tests pass. |
 
 ## 6. Limitations / Missing Components
 
@@ -171,7 +176,16 @@ Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-pe
 - **No base motion controller.** The base is commanded by setting `ctrl["base_x"]` directly (M5).
 - **Base y and orientation are fixed.** Translation along x only; the arm cannot reach both beds from one x-line.
 - **No perception module.** Vision is available as observations, but there is no detector or deprojection (M6).
-- **No IK, no scripted controller, no orchestration** (M7–M10). Not needed for RL; needed for demonstrations if VLA training follows.
+- **No orchestration** (M10). One weed at a time; nothing sequences the field.
+- **The sowthistle cannot be grasped by its stalk.** Its CoACD pieces near the base are leaf blobs reaching 28 mm from the axis at every height, so the fingers always close on foliage rather than the 4 mm stem -- measured 37.7 N of spurious pull on the root from the close alone. The shepherd's purse has a clean 2.8 mm stem column at 6-8 mm above the soil and grasps properly. Fixing the sowthistle means re-decomposing it or giving the stem its own thin capsule.
+- **The grasp window is 6 mm tall.** Below `GRASP_HEIGHT` the fingertip pads wedge into the bed; a few mm above it, leaf geometry takes over. It holds through the lift but the plant drops out of the fingers during the retreat.
+- **The grasp is a weld, not friction.** See §8. The condition is geometric, but the hold itself is modelled rather than simulated.
+- **The fingertips pass through leaves.** They only collide with the stalk. Real leaves are thin and would be brushed aside; ours are rigid convex lumps, and one 22 mm out would otherwise jam the jaws before they reached the stem.
+- **The fingertips also pass through the strawberries**, which carry no grippable bit. The crop cannot be grasped at all, rather than being grasped and rejected. Harmless until M10 needs the robot to demonstrate leaving it alone.
+- **The weed hangs on the pads for 0.58 s after the fingers open.** That is the price of the squash: the pads are 8.5 mm inside the stem and have to clear it before the plant can fall. Less compliance releases faster but cannot grip -- see the note on solimp in §8.
+- **40 deg off the stalk's axis is as side-on as the arm gets.** Two separate limits, and they are easy to confuse. The gripper *fits* at any angle up to 75 deg -- measured, the deepest part is only 12-16 mm below the tool point until 90 deg, where link6 swings down 49 mm. But *getting there* is the binding constraint: past 40 deg there is no path down to the stalk that keeps the fingers off the bed, and the solve stalls 70-110 mm short. Measured distance from the tool point to the stalk at the end of the approach: 1.1 mm at 40 deg, 68 mm at 60 deg, 113 mm at 75 deg, at every grasp height from 14 to 40 mm. A stalled approach is not an obvious failure -- the gripper closes on nothing and then sinks toward the target during the turn, which looks like a grasp that slips. A true level grasp needs a purpose-built end effector, which is what the weeding literature uses (thin jaws, three-arm grippers, soil-loosening heads) rather than a stock Panda hand.
+- **The arm grazes the bed during the twist.** link5 brushes it by 0.94 mm. Collision avoidance constrains joint velocity and is re-applied each control tick; the twist asks for a large reconfiguration in one tick, so the solve ends on the boundary instead of a full CLEARANCE clear of it.
+- **Only 2 of 3 weeds tested come out.** shepherd_1 and shepherd_2 uproot; shepherd_3 on the far bed reaches load 1.19 but not for the 20 ms the root needs it sustained.
 - **Vision is slow**: 8.4 steps/s with one 128x128 camera against 97 state-only. Mesh decimation is the untried lever.
 - **Leaves are rigid.** The stalk bends; individual leaves do not. The sowthistle mesh is 27 separable pieces and could support per-leaf hinges; the shepherd's purse is one welded surface and could not.
 - **No soil model.** Beds are rigid boxes. Nothing can be dug, and root resistance is a constraint, not soil mechanics.
@@ -189,9 +203,9 @@ Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-pe
 - **M4 — Real textures, no colour cues. DONE.**
 - **M5 — Base motion controller.** Drive to a target x and stop within tolerance.
 - **M6 — Perception: weed versus crop from an image.** Bootstrap on ground-truth positions, then a real detector on the wrist camera; deproject to world.
-- **M7 — Arm IK to a pre-grasp pose.** Open gripper ~5 cm above the detected point.
-- **M8 — Grasp.** Descend, close, confirm hold through finger contact.
-- **M9 — Pull and retreat.** Exceed the root threshold, verify the plant separates, return to a safe pose.
+- **M7 — Arm IK to a pre-grasp pose. DONE.** mink differential IK, collision-aware.
+- **M8 — Grasp. DONE for the shepherd's purse.** Descend through the foliage, close on the stalk, hold confirmed through finger contact.
+- **M9 — Pull and retreat. DONE for the shepherd's purse.** Twist plus lift exceeds the combined root criterion; the plant separates and the arm returns home.
 - **M10 — Orchestrator.** State machine over all weeds, never grasping a strawberry.
 
 ## 8. Technical Constraints and Decisions
@@ -208,7 +222,7 @@ Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-pe
 
 **D435i:** `pos="0.05 0 0.04"` on the `hand` body, `xyaxes="0 -1 0 1 0 0"`. Colour camera at x=+0.0325, depth at x=+0.0175, both 4.2 mm behind the glass; fovy 42° and 58° per the datasheet.
 
-**Weed collision:** visual mesh is `contype=0 conaffinity=0 group=2`; collision is the CoACD decomposition at `group=3 condim=4 friction="1.5 0.02 0.001"`. MuJoCo replaces a mesh geom with its convex hull, which is 20–70 mm wide where the real stem is 1–2.5 mm — the fingers would close on empty air. Measured graspable width at the shepherd's stalk: 3.4 mm.
+**Weed collision:** visual mesh is `contype=0 conaffinity=0 group=2`; collision is the CoACD decomposition at `group=3 condim=4 friction="1.5 0.02 0.001" solref="0.005 1" solimp="0.05 0.99 0.012"`. The stem is compressible, and the *shape* of the give matters as much as the amount: impedance ramps from almost nothing at first touch to nearly rigid over 12 mm, so the pads sink in and then meet something firm enough to hold. Measured at the grip: 8.5 mm of squash at 9.3 N. A uniformly soft stem squashes but cannot be gripped -- the pads sink in without building force and the stem squirts out sideways, which capped the grip near 3 N however hard the fingers were commanded, and the extraction failed. On MuJoCo's rigid defaults the opposite happened: an immovable wall, 4.9 mm of interpenetration at 66.7 N, and the weed carried around on friction long after the fingers opened. MuJoCo replaces a mesh geom with its convex hull, which is 20–70 mm wide where the real stem is 1–2.5 mm — the fingers would close on empty air. Measured graspable width at the shepherd's stalk: 3.4 mm.
 
 **Root anchorage:** one `<weld>` per weed, `anchor` at the planted position, `solref="0.01 1" solimp="0.95 0.99 0.001"`. `anchor` must be set explicitly; the default relpose drags the plant off its spot. Break force 15 N, sustained 20 ms, counted only along the planting axis. MuJoCo equalities have no break force, so `Roots.snap()` does it.
 
@@ -218,6 +232,18 @@ Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-pe
 
 **Interactive drag:** a critically damped spring sized to the grabbed body's mass, `ROOT_BREAK_FORCE / DRAG_TRAVEL` stiffness, clamped at 1.3×. MuJoCo's own perturbation scales with mass and gives a 15 g plant ~0.3 N. An undamped spring on a 2 g stalk tip rings at ~80 Hz and throws force spikes into the root.
 
+**Root failure criterion:** tension and torsion combine linearly -- `axial/15 N + torsion/0.04 N.m >= 1`, sustained 20 ms. A root shears in torsion as well as pulling out, which is why twisting a weed loose beats hauling on it. `ROOT_BREAK_TORQUE = 0.04 N.m`: the same soil friction resists both pull and twist, acting at the root's own radius, so the torque it takes is the break force times that radius -- 15 N across a 2.7 mm taproot. The first value, 0.15, assumed a 10 mm radius and was far too generous; at 0.04 the twist genuinely carries the extraction, which is the point of twisting a weed rather than hauling on it. Measured: a sustained twist about the planting axis used to read exactly 0.00 N of axial force and never uprooted anything, because `axial_force` reads only the first three of the weld's six constraint rows.
+
+**IK:** mink 1.2.0 -- the last release that accepts `mujoco==3.8.1`; 1.3.0 requires 3.10. Built on a plant-free copy of the scene, because the weeds' 96 free-joint DOFs would otherwise enter every QP as variables the arm cannot move (3.5x slower, and mink's posture and configuration limits divide by zero on them). The rail and the fingers are frozen with `DofFreezingTask` so an unreachable target stays unreachable. Joint velocity limits are mandatory, not cosmetic: collision avoidance constrains velocity, so without a speed cap the solver takes a step big enough to jump the 80 mm detection band and puts the elbow through a bed. `base_cart` is excluded from collision avoidance -- it is a visual box drawn under `link0`, so `link1` touches it at zero distance and any clearance against it makes the QP infeasible.
+
+**Grasping:** a MuJoCo parallel jaw holds by friction, and this one cannot. The menagerie gripper servo is `biasprm="0 -100 -10"`, about 0.1 N per mm, so on a 3 mm stalk it squeezes ~1.3 N and holds ~2 N against a root that takes 15 N. Left to friction the jaws close straight through the stem and shut on each other -- measured finger gap 0.0 mm through a "grasp", with the plant's collision pieces sitting inside the closed fingers and the actuator reading 0.00 N. The apparent 67 N grip seen earlier was the solver pushing overlapping shapes apart, never the actuator, which is also why the weed clung to the pads for seconds after they opened. So the hold is made explicit with a weld, toggled at runtime exactly as the root is, which is the standard approach in MuJoCo manipulation work. `env.Grasp` owns it; the honesty lives in `Grasp.closed`, a geometric test that both fingertip pads are on the plant.
+
+**Grippable bit:** the fingertip pads carry `contype=2 conaffinity=2` and only the stalk capsule and the soil advertise that bit. The pads therefore pinch stems and stop at the bed, and pass through foliage. Without this a leaf 22 mm from the axis jams the jaws at a 14 mm half-gap, 20 mm short of the stem.
+
+**Aiming:** `uproot.stem_centre` returns a point on the weed body's own z axis. Anything derived from the collision pieces -- their vertex centroid, or the midpoint of their span -- lands out in the leaves, several mm off the stalk, which on a 3 mm stem is the difference between a grasp and closing on air. Both were tried and both miss.
+
+**Twist angle:** 10 degrees. With a rigid grasp the arm turns the plant against a stiff root, so the torque climbs with the angle and anything past about 15 degrees shears the root on the twist alone -- at 20 degrees and above the reaction saturates near 0.073 N.m whatever is commanded. At 10 the twist carries 67% of the root's capacity and the pull supplies the other 57%.
+
 **No artificial colour for classification** (hard requirement). `rgba` may be used for rendering realism only.
 
 **Coordinate convention:** MuJoCo world frame, +z up, base travel along +x.
@@ -225,7 +251,7 @@ Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-pe
 ## 9. Software / Environment
 
 **`.venv`** (Python 3.12, the only venv):
-- `mujoco` 3.8.1, `gymnasium` 1.3.0, `numpy` 2.2.6, `opencv-python` 4.12.0.88, `draccus` 0.11.6 — all pinned in `pyproject.toml` to match the Docker image.
+- `mujoco` 3.8.1, `mink` 1.2.0, `gymnasium` 1.3.0, `numpy` 2.2.6, `opencv-python` 4.12.0.88, `draccus` 0.11.6 — all pinned in `pyproject.toml` to match the Docker image.
 - `pytest` via the `[dev]` extra.
 - `trimesh` and `coacd` were used to prepare the plant assets. They are not project dependencies; the generated meshes are committed.
 
@@ -256,3 +282,43 @@ Run: `cd workspace/planning/weed_extraction && ../../../.venv/bin/python -m pyte
 
 After **every** completed implementation step, update this file **before** starting the next. Append a dated entry with: milestone completed, files changed, implementation details, tests performed and results, current status, next milestone, and any decisions or parameters introduced. Also update the numbered sections above so the top of the document reflects reality.
 
+---
+
+## 2026-09-13 — M7-M9: collision-aware IK, root torsion, scripted extraction
+
+**Milestone:** M7 done; M8 and M9 done for the shepherd's purse.
+
+**Files changed**
+- `workspace/hardware/panda_description/mobile_panda.xml` — added `grasp_site` on the `hand` body at `0 0 0.1034` (the Franka TCP, between the closed fingertip pads). It is the only thing IK aims at; the robot had no sites at all before.
+- `weed_extraction/env.py` — `ROOT_BREAK_TORQUE`, `Roots.torsion`, `Roots.load`; `snap` now tests the combined criterion instead of the axial force alone. `Roots._rows` factors out the weld's six constraint rows.
+- `weed_extraction/ik.py` — new. `ik_model`, `pose`, `ArmIK`.
+- `weed_extraction/uproot.py` — new. `stem_centre`, `Uprooter`, the seven-phase sequence.
+- `weed_extraction/launch.py` — `uproot` mode; `control_hz` and `weed` config fields; `drag_force` lost its `stiffness` parameter, `parse_config` lost both of its, and `capture` now calls `make_env` instead of repeating it.
+- `configs/uproot.yaml`, `run_scripts/test_up_root.sh`, `tests/test_ik.py`, `tests/test_uproot.py` — new.
+- `pyproject.toml` — `mink==1.2.0`, and a `slow` pytest marker.
+
+**Tests:** 30 pass, up from 14. The three marked `slow` drive the whole arm through an extraction.
+
+**Measured**
+- IK: 7 iterations, 0.003 mm, ~0.25 ms per solve on the plant-free model (nq=nv=10 against the scene's 114/106).
+- Extraction: uproots at t=12.1 s, 16.9 N of pull and 0.061 N.m of twist, gripped at the moment it separates.
+- Twist alone used to do nothing: 0.00 N of axial reading at every torque from 0.02 to 0.5 N.m.
+- The shepherd's stem at 6-8 mm above the soil is a 2.8 x 2.6 mm column, 1.0 mm off the body origin, and the only collision piece in the fingertips' window. At 10 mm and above, leaf pieces reaching 15.9 mm take over.
+
+**Decisions:** see §8 for the root failure criterion and the IK constraints. Three dead ends worth not repeating: `base_cart` cannot be given collision or any IK clearance (it overlaps `link1` by construction); the gripper needs a smaller clearance than the arm or it can never reach the soil; and without joint velocity limits the collision avoidance is bypassed entirely.
+
+**Next:** M6 perception, then M10 orchestration. Before either, the sowthistle needs a graspable stem (see §6).
+
+---
+
+## 2026-09-13 (later) — side grasp, and the base standing still
+
+**Files changed:** `weed_extraction/ik.py` (`pose` now takes an approach direction and builds the frame from it, turning `twist` about the world vertical via `SO3.from_z_radians`), `weed_extraction/uproot.py` (rewritten: phases are a data table, `TILT`, base commanded once), `tests/test_ik.py`, `tests/test_uproot.py`.
+
+**Two bugs fixed.** The base was re-deriving its target every tick from the per-phase clock, which restarts at each phase, so it paced back and forth; it is now commanded once in `__init__` and its servo takes it there. And `stem_centre` took its height as a default argument bound at import, so any override was silently ignored.
+
+**The side grasp.** `TILT` is the angle off the stalk's own axis; 60 deg is the default. Measured required tool-point height against angle: 0-75 deg all need only 15-18 mm, but 90 deg needs 52 mm because link6 swings down — see §6. The twist is about the world vertical, which is the only rotation `Roots.torsion` reads.
+
+**Correction to the earlier entry:** I first reported a level grasp as blocked from about 45 deg onward. That was wrong — it came from testing a handful of angles with cold IK solves from the home pose, where the collision limit stalls for want of room to work around. Sweeping the actual geometry shows everything up to 75 deg is comfortable.
+
+**Tests:** 31 pass. `test_the_arm_never_drives_into_the_beds_or_the_ground` asserts a bounded graze rather than zero contact, for the reason in §6.

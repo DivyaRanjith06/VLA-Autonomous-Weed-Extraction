@@ -16,6 +16,7 @@ toy version of it.
 - [Run it natively](#run-it-natively)
 - [Run it in Docker](#run-it-in-docker)
 - [Pull a weed out](#pull-a-weed-out)
+- [Watch the robot do it](#watch-the-robot-do-it)
 - [Configuration](#configuration)
 - [Tests](#tests)
 - [API](#api)
@@ -127,6 +128,25 @@ Once the window is open:
 Drag sideways instead and it only bends — the root gives way to an upward pull, the way
 a real one does. Press **F1** for the viewer's other controls.
 
+## Watch the robot do it
+
+```
+./run_scripts/test_up_root.sh
+```
+
+The arm drives to a weed, comes in on the stalk from the side rather than straight down
+its axis, closes on it 14 mm above the soil, gives it a short turn about the vertical and
+pulls it out. The terminal names each phase and prints the pull and the twist the root felt when
+it gave way.
+
+Roots fail on twist as well as pull, so the two are combined: 15 N of straight pull will
+do it, so will 0.15 Nm of twist on its own, and any mix in between. That is why twisting
+works — it buys you the pull the arm would otherwise have to apply.
+
+Pick a different weed with `./run_scripts/test_up_root.sh --weed=shepherd_2`. The
+shepherd's purse is the one to try: the sowthistle's collision mesh has no exposed stem
+to grip.
+
 ## Configuration
 
 `simulate.sh` passes everything through to the launcher.
@@ -149,9 +169,10 @@ cd workspace/planning/weed_extraction
 ../../../.venv/bin/python -m pytest
 ```
 
-Fourteen checks covering the scene, the gripper's grip on a stem, the root breaking at
+Thirty-two checks covering the scene, the gripper's grip on a stem, the root breaking at
 the right force and only in the right direction, the stalk bending and springing back,
-and the crop staying put.
+the crop staying put, the IK keeping the arm out of the beds, and the whole
+grasp-twist-pull sequence end to end.
 
 ## API
 

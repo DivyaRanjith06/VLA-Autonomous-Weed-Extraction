@@ -96,9 +96,14 @@
         <default class="weed_visual">
             <geom type="mesh" contype="0" conaffinity="0" group="2"/>
         </default>
-        <!-- condim=4 adds torsional friction, so a gripped stem cannot spin free. -->
+        <!-- condim=4 adds torsional friction, so a gripped stem cannot spin free.
+             The stem gives by about a millimetre and no more. A wider give was tried
+             and is wrong twice over: a 3 mm stalk cannot squash 12 mm, and a jaw that
+             meets that little resistance closes straight through the stem and shuts on
+             itself, leaving the plant sitting inside the closed fingers. -->
         <default class="weed_collision">
-            <geom type="mesh" group="3" condim="4" friction="1.5 0.02 0.001"/>
+            <geom type="mesh" group="3" condim="4" friction="1.5 0.02 0.001"
+                  solref="0.005 1" solimp="0.9 0.95 0.001"/>
         </default>
         <!-- Stiff enough to stand up under its own weight, soft enough to be pushed
              aside. The armature is what sets the sway: the segments' own inertia is
@@ -120,6 +125,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
             <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="sowthistle_col_4"/>
             <geom class="weed_collision" mesh="sowthistle_col_9"/>
             <geom class="weed_collision" mesh="sowthistle_col_32"/>
@@ -183,6 +198,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
             <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="sowthistle_col_4"/>
             <geom class="weed_collision" mesh="sowthistle_col_9"/>
             <geom class="weed_collision" mesh="sowthistle_col_32"/>
@@ -246,6 +271,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
             <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="sowthistle_col_4"/>
             <geom class="weed_collision" mesh="sowthistle_col_9"/>
             <geom class="weed_collision" mesh="sowthistle_col_32"/>
@@ -309,6 +344,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0060" diaginertia="8.00e-07 8.00e-07 2.67e-07"/>
             <geom class="weed_visual" mesh="sowthistle_band_0" material="sowthistle_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="sowthistle_col_4"/>
             <geom class="weed_collision" mesh="sowthistle_col_9"/>
             <geom class="weed_collision" mesh="sowthistle_col_32"/>
@@ -372,6 +417,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
             <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="shepherd_col_0"/>
             <geom class="weed_collision" mesh="shepherd_col_1"/>
             <geom class="weed_collision" mesh="shepherd_col_7"/>
@@ -415,6 +470,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
             <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="shepherd_col_0"/>
             <geom class="weed_collision" mesh="shepherd_col_1"/>
             <geom class="weed_collision" mesh="shepherd_col_7"/>
@@ -458,6 +523,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
             <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="shepherd_col_0"/>
             <geom class="weed_collision" mesh="shepherd_col_1"/>
             <geom class="weed_collision" mesh="shepherd_col_7"/>
@@ -501,6 +576,16 @@
             <freejoint/>
             <inertial pos="0 0 0.0200" mass="0.0032" diaginertia="4.27e-07 4.27e-07 1.42e-07"/>
             <geom class="weed_visual" mesh="shepherd_band_0" material="shepherd_plant"/>
+            <!-- The stem itself. The convex pieces around it are leaves as much as
+                 stalk and leave gaps a two-finger jaw closes straight through; this
+                 gives the gripper one continuous thing to pinch, up the rigid lower
+                 40 mm. Radius matches the measured 2.3-4.3 mm stalk. The extra
+                 contype bit is what the fingertips look for: they pinch this and
+                 pass through the leaves, which are rigid convex lumps here but
+                 thin and floppy on a real plant. Without that a leaf 22 mm out
+                 jams the jaws before they ever reach the stem. -->
+            <geom class="weed_collision" type="capsule" fromto="0 0 0.004 0 0 0.038" size="0.0016"
+                  contype="3" conaffinity="3"/>
             <geom class="weed_collision" mesh="shepherd_col_0"/>
             <geom class="weed_collision" mesh="shepherd_col_1"/>
             <geom class="weed_collision" mesh="shepherd_col_7"/>
@@ -559,6 +644,31 @@
               solref="0.01 1" solimp="0.95 0.99 0.001"/>
         <weld name="shepherd_4_root" body1="shepherd_4" anchor="0.55 0.50 0.10"
               solref="0.01 1" solimp="0.95 0.99 0.001"/>
+
+        <!-- The grasp. A parallel jaw holds an object by friction, and the Panda's
+             gripper servo is about 0.1 N per mm: on a 3 mm stalk that is ~1.3 N of
+             squeeze and ~2 N of friction, against a root that takes 15 N. It can
+             never win, and what looks like grip is the solver pushing overlapping
+             shapes apart. So once the jaws have actually closed on the stem the hold
+             is made explicit, the same way the root itself is. weed_extraction.env
+             activates these; the honesty is in the condition, which is both fingertip
+             pads touching the plant, not the gripper command. -->
+        <weld name="sowthistle_1_grasp" body1="hand" body2="sowthistle_1" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
+        <weld name="sowthistle_2_grasp" body1="hand" body2="sowthistle_2" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
+        <weld name="sowthistle_3_grasp" body1="hand" body2="sowthistle_3" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
+        <weld name="sowthistle_4_grasp" body1="hand" body2="sowthistle_4" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
+        <weld name="shepherd_1_grasp" body1="hand" body2="shepherd_1" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
+        <weld name="shepherd_2_grasp" body1="hand" body2="shepherd_2" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
+        <weld name="shepherd_3_grasp" body1="hand" body2="shepherd_3" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
+        <weld name="shepherd_4_grasp" body1="hand" body2="shepherd_4" active="false"
+              solimp="0.95 0.99 0.001" solref="0.005 1"/>
     </equality>
 
 </mujoco>

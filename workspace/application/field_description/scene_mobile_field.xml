@@ -150,6 +150,7 @@
             type="plane"
             pos="0 0 -0.02"
             size="8 8 0.1"
+            conaffinity="3"
             material="grass"/>
 
 
@@ -163,6 +164,7 @@
             pos="0.80 -0.50 0.05"
             size="2.5 0.35 0.05"
             friction="0.7 0.005 0.0001"
+            conaffinity="3"
             material="soil"/>
 
 
@@ -176,6 +178,7 @@
             pos="0.80 0.50 0.05"
             size="2.5 0.35 0.05"
             friction="0.7 0.005 0.0001"
+            conaffinity="3"
             material="soil"/>
 
 

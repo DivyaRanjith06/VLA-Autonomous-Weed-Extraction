@@ -1,0 +1,5 @@
+# Scripted extraction: the arm reaches over a weed, takes the stalk low down, twists
+# it and pulls it out. Watch it happen in the viewer.
+mode: uproot
+weed: shepherd_1
+control_hz: 50   # the viewer syncs once per control tick, so this is the frame rate too

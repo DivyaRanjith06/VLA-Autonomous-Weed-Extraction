@@ -52,14 +52,34 @@ def test_weed_collides_with_its_decomposition_not_its_hull(model):
     for weed, pieces in (("sowthistle_1", 40), ("shepherd_1", 20)):
         geoms = plant_geoms(model, weed)
         visual = [g for g in geoms if g.contype[0] == 0 and g.conaffinity[0] == 0]
-        collision = [g for g in geoms if g.contype[0] != 0]
+        foliage = [g for g in geoms if g.contype[0] != 0
+                   and model.geom_type[g.id] == mujoco.mjtGeom.mjGEOM_MESH]
         assert len(visual) == 4, "one visual band per segment"
-        assert len(collision) == pieces
-        for g in collision:
-            assert model.geom_type[g.id] == mujoco.mjtGeom.mjGEOM_MESH
+        assert len(foliage) == pieces
+        for g in foliage:
             assert model.geom_condim[g.id] == 4  # torsional friction: no spinning free
             assert model.geom_group[g.id] == 3   # hidden in the viewer by convention
-        assert max(model.geom_rbound[g.id] for g in collision) < 0.09
+        assert max(model.geom_rbound[g.id] for g in foliage) < 0.09
+
+
+def test_the_stalk_is_the_only_thing_the_fingertips_can_pinch(model):
+    """A leaf 22 mm out otherwise jams the jaws before they reach the 3 mm stem."""
+    grippable = 2  # the bit the fingertip pads look for
+    for weed in ("sowthistle_1", "shepherd_1"):
+        stalk = [g for g in plant_geoms(model, weed)
+                 if model.geom_type[g.id] == mujoco.mjtGeom.mjGEOM_CAPSULE]
+        assert len(stalk) == 1, "one stem, on the rigid lower section"
+        assert model.geom_conaffinity[stalk[0].id] & grippable
+        assert model.geom_size[stalk[0].id][0] < 0.005  # a stalk, not a trunk
+        for g in plant_geoms(model, weed):
+            if model.geom_type[g.id] == mujoco.mjtGeom.mjGEOM_MESH:
+                assert not model.geom_conaffinity[g.id] & grippable, "leaves are not grippable"
+    pads = [g for g in range(model.ngeom)
+            if model.body(model.geom_bodyid[g]).name.endswith("_finger")
+            and model.geom_type[g] == mujoco.mjtGeom.mjGEOM_BOX]
+    assert len(pads) == 10
+    for g in pads:
+        assert model.geom_contype[g] == grippable
 
 
 def test_base_is_rigid_and_the_stalk_above_it_bends(model):
