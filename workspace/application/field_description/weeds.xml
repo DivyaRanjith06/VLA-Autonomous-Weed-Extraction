@@ -671,4 +671,44 @@
               solimp="0.95 0.99 0.001" solref="0.005 1"/>
     </equality>
 
+    <!-- The hand and wrist camera pass through the sowthistles' foliage, for the same
+         reason the fingertips do: the leaves are rigid convex lumps here but thin and
+         floppy on a real plant. Its canopy is wide enough that the hand otherwise
+         shoves the plant 35 deg over and tears the root out during the approach.
+         Excludes are per body, not per subtree, so every segment is listed. -->
+    <contact>
+        <exclude body1="hand" body2="sowthistle_1"/>
+        <exclude body1="hand" body2="sowthistle_1_s1"/>
+        <exclude body1="hand" body2="sowthistle_1_s2"/>
+        <exclude body1="hand" body2="sowthistle_1_s3"/>
+        <exclude body1="hand" body2="sowthistle_2"/>
+        <exclude body1="hand" body2="sowthistle_2_s1"/>
+        <exclude body1="hand" body2="sowthistle_2_s2"/>
+        <exclude body1="hand" body2="sowthistle_2_s3"/>
+        <exclude body1="hand" body2="sowthistle_3"/>
+        <exclude body1="hand" body2="sowthistle_3_s1"/>
+        <exclude body1="hand" body2="sowthistle_3_s2"/>
+        <exclude body1="hand" body2="sowthistle_3_s3"/>
+        <exclude body1="hand" body2="sowthistle_4"/>
+        <exclude body1="hand" body2="sowthistle_4_s1"/>
+        <exclude body1="hand" body2="sowthistle_4_s2"/>
+        <exclude body1="hand" body2="sowthistle_4_s3"/>
+        <exclude body1="d435i" body2="sowthistle_1"/>
+        <exclude body1="d435i" body2="sowthistle_1_s1"/>
+        <exclude body1="d435i" body2="sowthistle_1_s2"/>
+        <exclude body1="d435i" body2="sowthistle_1_s3"/>
+        <exclude body1="d435i" body2="sowthistle_2"/>
+        <exclude body1="d435i" body2="sowthistle_2_s1"/>
+        <exclude body1="d435i" body2="sowthistle_2_s2"/>
+        <exclude body1="d435i" body2="sowthistle_2_s3"/>
+        <exclude body1="d435i" body2="sowthistle_3"/>
+        <exclude body1="d435i" body2="sowthistle_3_s1"/>
+        <exclude body1="d435i" body2="sowthistle_3_s2"/>
+        <exclude body1="d435i" body2="sowthistle_3_s3"/>
+        <exclude body1="d435i" body2="sowthistle_4"/>
+        <exclude body1="d435i" body2="sowthistle_4_s1"/>
+        <exclude body1="d435i" body2="sowthistle_4_s2"/>
+        <exclude body1="d435i" body2="sowthistle_4_s3"/>
+    </contact>
+
 </mujoco>

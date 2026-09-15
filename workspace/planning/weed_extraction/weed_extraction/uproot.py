@@ -17,7 +17,9 @@ from weed_extraction.ik import ArmIK, pose
 
 # How far up the stalk to take it. Lower and the fingertip pads wedge into the bed;
 # this is inside the rigid lower 40 mm, so the whole plant turns with the gripper.
-GRASP_HEIGHT = 0.014
+# The arm settles about 2 mm below its commanded tool point, so 14 mm left the pads
+# touching the bed at every weed but shepherd_1; 16 mm clears it at all eight.
+GRASP_HEIGHT = 0.016
 
 STANDOFF = 0.14         # metres back from the stalk to line up before reaching in
 HEADROOM = 0.07         # metres above the plant's own tip to line up, clear of its leaves

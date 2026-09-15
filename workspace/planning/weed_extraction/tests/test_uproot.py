@@ -41,6 +41,44 @@ def hold(env, body, force=np.zeros(3), torque=np.zeros(3), seconds=0.5):
     return worst, False
 
 
+def pinch(env, weed, gap, sink=5e-5):
+    """Stand `weed`'s stem between the open jaws, pressed `sink` into the left pad and
+    `gap` from the right one. Returns the measured left and right pad distances."""
+    model, data, grasp = env.model, env.data, env.grasp
+    stem = grasp.stems[weed]
+    fingers = [model.joint(j).qposadr[0] for j in ("finger_joint1", "finger_joint2")]
+    free = model.jnt_qposadr[model.body_jntadr[model.body(weed).id]]
+
+    def distance(side):
+        return min(mujoco.mj_geomDistance(model, data, g, stem, 0.05, None)
+                   for g in grasp.pads[side])
+
+    def pad(side):
+        return data.geom_xpos[grasp.pads[side][0]].copy()
+
+    mujoco.mj_forward(model, data)
+    data.qpos[free:free + 3] = (pad("left_finger") + pad("right_finger")) / 2 - model.geom_pos[stem]
+    data.qpos[free + 3:free + 7] = [1, 0, 0, 0]
+    mujoco.mj_forward(model, data)
+    across = pad("left_finger") - pad("right_finger")
+    across /= np.linalg.norm(across)
+    for _ in range(10):  # the distance query is not linear over tens of mm, so iterate
+        data.qpos[fingers] += (gap - sink - distance("left_finger") - distance("right_finger")) / 2
+        mujoco.mj_forward(model, data)
+        data.qpos[free:free + 3] += across * (distance("left_finger") + sink)
+        mujoco.mj_forward(model, data)
+    return distance("left_finger"), distance("right_finger")
+
+
+@pytest.mark.parametrize("gap, closed", [(0.0005, True), (0.002, False)])
+def test_one_pad_on_the_stem_is_a_grasp_only_if_the_other_is_close(env, gap, closed):
+    """The linked fingers stop when the first pad lands, and a stem welded rigidly at the
+    root cannot centre itself, so the second pad can be left a fraction of a mm short."""
+    left, right = pinch(env, "sowthistle_2", gap)
+    assert left < 0 and right == pytest.approx(gap, abs=1e-4)
+    assert env.grasp.closed(env.data, "sowthistle_2") is closed
+
+
 def test_a_pure_twist_can_shear_the_root_on_its_own(env):
     """Torsion is a failure mode in its own right, not just a contribution."""
     axis = env.roots.up[env.roots.of_body[env.model.body(WEED).id]]
@@ -136,6 +174,30 @@ def test_the_approach_does_not_disturb_the_weed(env, ik):
         env.step(env.data.ctrl)
     assert env.data.eq_active[runner.root]
     assert runner.peak_load < 0.5
+
+
+@pytest.mark.slow
+def test_the_approach_does_not_tear_out_a_sowthistle(env, ik):
+    """Its canopy is wide enough to catch the hand and camera on the way in."""
+    runner = Uprooter(env, "sowthistle_1", ik=ik)
+    while runner.phase < 3:  # reach, settle, close in
+        assert runner.step() is not None
+        env.step(env.data.ctrl)
+        assert env.data.eq_active[runner.root], f"root tore out at {env.data.time:.2f} s"
+    assert runner.phases[runner.phase][0] == "grip"
+    assert runner.uprooted is None
+
+
+@pytest.mark.slow
+def test_a_stem_off_centre_in_the_jaws_is_still_held(env, ik):
+    """The arm settles 0.23 mm to one side of sowthistle_2, so only one pad reaches it."""
+    runner = Uprooter(env, "sowthistle_2", ik=ik)
+    held_during_lift = []
+    while (name := runner.step()) not in (None, "retreat"):
+        env.step(env.data.ctrl)
+        if name == "lift":
+            held_during_lift.append(runner.holding)
+    assert held_during_lift and all(held_during_lift)
 
 
 @pytest.mark.slow

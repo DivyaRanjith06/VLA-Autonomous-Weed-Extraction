@@ -154,6 +154,12 @@ class Grasp:
     """
 
     PADS = ("left_finger", "right_finger")
+    # How far the second fingertip may still be from the stem when the first is on it.
+    # The fingers are linked, so the first pad to land stops both; the stem is welded
+    # rigidly at the root and cannot give the fraction of a millimetre a real one would
+    # to centre itself, and an arm that settles 0.23 mm off-centre leaves the other pad
+    # 0.3-0.7 mm short however long the jaws squeeze.
+    REACH = 0.001
 
     def __init__(self, model):
         self.model = model
@@ -161,17 +167,37 @@ class Grasp:
                       if (model.eq(i).name or "").endswith("_grasp")}
         self.hand = model.body("hand").id
         self.held = None
+        # Only the pads collide; the finger shafts are visual.
+        self.pads = {name: [g for g in range(model.ngeom)
+                            if model.geom_bodyid[g] == model.body(name).id
+                            and (model.geom_contype[g] or model.geom_conaffinity[g])]
+                     for name in self.PADS}
+        self.stems = {weed: next(g for g in range(model.ngeom)
+                                 if model.geom_bodyid[g] == model.body(weed).id
+                                 and model.geom_type[g] == mujoco.mjtGeom.mjGEOM_CAPSULE)
+                      for weed in self.welds}
 
     def closed(self, data, weed):
-        """True when both fingertips are touching the weed."""
+        """True when both fingertips are on the weed, or one is on its stem and the
+        other is within REACH of it."""
         model = self.model
         root = model.body(weed).id
-        touching = set()
+        stem = self.stems[weed]
+        touching, on_stem = set(), set()
         for contact in data.contact[:data.ncon]:
             bodies = [model.geom_bodyid[contact.geom1], model.geom_bodyid[contact.geom2]]
             if any(model.body_rootid[b] == root for b in bodies):
-                touching |= {model.body(b).name for b in bodies} & set(self.PADS)
-        return len(touching) == len(self.PADS)
+                fingers = {model.body(b).name for b in bodies} & set(self.PADS)
+                touching |= fingers
+                if stem in (contact.geom1, contact.geom2):
+                    on_stem |= fingers
+        if len(touching) == len(self.PADS):
+            return True
+        if len(on_stem) != 1:
+            return False
+        (other,) = set(self.PADS) - on_stem
+        return min(mujoco.mj_geomDistance(model, data, g, stem, 2 * self.REACH, None)
+                   for g in self.pads[other]) <= self.REACH
 
     def take(self, data, weed):
         """Weld the weed to the hand exactly where it is, so nothing jumps."""

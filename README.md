@@ -17,6 +17,7 @@ toy version of it.
 - [Run it in Docker](#run-it-in-docker)
 - [Pull a weed out](#pull-a-weed-out)
 - [Watch the robot do it](#watch-the-robot-do-it)
+- [Current status](#current-status)
 - [Configuration](#configuration)
 - [Tests](#tests)
 - [API](#api)
@@ -135,17 +136,40 @@ a real one does. Press **F1** for the viewer's other controls.
 ```
 
 The arm drives to a weed, comes in on the stalk from the side rather than straight down
-its axis, closes on it 14 mm above the soil, gives it a short turn about the vertical and
-pulls it out. The terminal names each phase and prints the pull and the twist the root felt when
+its axis, closes on it 16 mm above the soil, gives it a short turn about the vertical and
+lifts. The terminal names each phase and prints the pull and the twist the root felt when
 it gave way.
 
 Roots fail on twist as well as pull, so the two are combined: 15 N of straight pull will
-do it, so will 0.15 Nm of twist on its own, and any mix in between. That is why twisting
+do it, so will 0.07 N·m of twist on its own, and any mix in between. That is why twisting
 works — it buys you the pull the arm would otherwise have to apply.
 
-Pick a different weed with `./run_scripts/test_up_root.sh --weed=shepherd_2`. The
-shepherd's purse is the one to try: the sowthistle's collision mesh has no exposed stem
-to grip.
+Pick a different weed with `--weed`, for example
+`./run_scripts/test_up_root.sh --weed=sowthistle_2`. The next section says what to expect
+from each species.
+
+## Current status
+
+The default weed, `shepherd_1`, comes out the way it is meant to: the root gives way during
+the lift, on pull and twist together.
+
+All four sowthistles now reach the grip without being knocked over, register as held, and
+are carried out of the bed. Their roots break too early, though. The twist alone breaks
+them, at about 0.4–0.5 N of pull, so the lift carries a plant that is already loose. Treat
+sowthistle extraction as work in progress, not as a realistic pull-and-twist extraction.
+
+Two things make the sowthistle grasp work:
+
+- **The hand and wrist camera pass through sowthistle leaves.** Real leaves are thin and
+  get brushed aside; here they are rigid, and the wide sowthistle canopy otherwise gets
+  shoved over before the fingers arrive.
+- **The grasp has a 1 mm tolerance.** A grasp counts when both fingertips touch the stem,
+  or when one fingertip is on the stem and the other is within 1 mm of it. The two
+  fingers move together, so if the arm stops a fraction of a millimetre off-centre, the
+  first finger to touch stops both. Only contact with the target plant's own stem counts,
+  and only once the gripper has been told to close.
+
+The test suite passes: 36 tests.
 
 ## Configuration
 
@@ -169,10 +193,15 @@ cd workspace/planning/weed_extraction
 ../../../.venv/bin/python -m pytest
 ```
 
-Thirty-two checks covering the scene, the gripper's grip on a stem, the root breaking at
+Thirty-six checks covering the scene, the gripper's grip on a stem, the root breaking at
 the right force and only in the right direction, the stalk bending and springing back,
-the crop staying put, the IK keeping the arm out of the beds, and the whole
-grasp-twist-pull sequence end to end.
+the crop staying put, the IK keeping the arm out of the beds, the whole
+grasp-twist-pull sequence end to end on the shepherd's purse, and the sowthistle reaching
+the grip and staying held.
+
+If you have ROS sourced and pytest fails before running anything with
+`No module named 'lark'`, run it as
+`env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../../.venv/bin/python -m pytest`.
 
 ## API
 
