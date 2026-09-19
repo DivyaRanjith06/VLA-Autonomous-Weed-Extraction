@@ -16,7 +16,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/* && apt-get update -yqqq
 RUN mkdir /tmp/runtime-root && chmod 0700 /tmp/runtime-root
 ENV XDG_RUNTIME_DIR=/tmp/runtime-root
 
-# General tools. ffmpeg is LeRobot's video encoder.
+# General tools.
 RUN apt-get install --no-install-recommends -yqqq \
     git \
     ca-certificates \
@@ -45,10 +45,7 @@ ENV PATH=/opt/venv/bin:$PATH
 # it, and then the mounted source is what runs.
 COPY workspace $WORKSPACE/workspace
 
-# LeRobot first: it pulls a headless OpenCV that the project package then replaces with
-# the full build, so cv2 windows work on a display.
-RUN pip install --no-cache-dir "$WORKSPACE/workspace/planning/lerobot" && \
-    pip install --no-cache-dir -e "$WORKSPACE/workspace/planning/weed_extraction[dev]"
+RUN pip install --no-cache-dir -e "$WORKSPACE/workspace/planning/weed_extraction[dev]"
 
 # MUJOCO_GL is deliberately unset: MuJoCo picks GLFW when a display is forwarded and
 # EGL when there is none, so one image serves both.

@@ -5,7 +5,7 @@ import pytest
 from weed_extraction.env import (ROOT_BREAK_FORCE, ROOT_BREAK_TORQUE,
                                  WeedExtractionEnv, reset_to_home)
 from weed_extraction.ik import ArmIK
-from weed_extraction.uproot import GRASP_HEIGHT, Uprooter, stem_centre
+from weed_extraction.uproot import Uprooter, stem_centre
 
 WEED = "shepherd_1"
 
@@ -34,8 +34,7 @@ def hold(env, body, force=np.zeros(3), torque=np.zeros(3), seconds=0.5):
         mujoco.mj_step(env.model, env.data)
         if env.data.eq_active[root]:
             worst = max(worst, (env.roots.load(env.data, root),
-                                env.roots.axial_force(env.data, root),
-                                env.roots.torsion(env.data, root)))
+                                *env.roots.wrench(env.data, root)))
         if env.roots.snap(env.data):
             return worst, True
     return worst, False
@@ -115,17 +114,17 @@ def test_twisting_while_pulling_uproots_below_the_straight_pull_force(env):
 def test_load_combines_the_two_channels(env):
     root = env.roots.of_body[env.model.body(WEED).id]
     mujoco.mj_forward(env.model, env.data)
-    expected = (env.roots.axial_force(env.data, root) / ROOT_BREAK_FORCE
-                + env.roots.torsion(env.data, root) / ROOT_BREAK_TORQUE)
+    pull, twist = env.roots.wrench(env.data, root)
+    expected = pull / ROOT_BREAK_FORCE + twist / ROOT_BREAK_TORQUE
     assert env.roots.load(env.data, root) == pytest.approx(expected)
 
 
 def test_stem_centre_lands_on_the_stalk(env):
     """A few millimetres matters when the stem is 3 mm wide."""
     model, data = env.model, env.data
-    centre = stem_centre(model, data, WEED, GRASP_HEIGHT)
+    centre = stem_centre(model, data, WEED, Uprooter.GRASP_HEIGHT)
     body = model.body(WEED).id
-    assert centre[2] == pytest.approx(data.xpos[body][2] + GRASP_HEIGHT)
+    assert centre[2] == pytest.approx(data.xpos[body][2] + Uprooter.GRASP_HEIGHT)
     stem = next(g for g in range(model.ngeom)
                 if model.body_rootid[model.geom_bodyid[g]] == body
                 and model.geom_type[g] == mujoco.mjtGeom.mjGEOM_CAPSULE)
@@ -139,7 +138,7 @@ def test_the_grasp_height_keeps_the_fingertips_out_of_the_soil(env):
     bed = env.model.geom("bed1")
     top = bed.pos[2] + bed.size[2]
     soil = env.data.xpos[env.model.body(WEED).id][2]
-    assert soil + GRASP_HEIGHT - 0.009 > top   # the pads reach 9 mm below the tool point
+    assert soil + Uprooter.GRASP_HEIGHT - 0.009 > top   # the pads reach 9 mm below the tool point
 
 
 @pytest.mark.slow

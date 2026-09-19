@@ -17,22 +17,19 @@ import numpy as np
 
 from weed_extraction.env import (ROOT_BREAK_FORCE, ROOT_BREAK_TORQUE, SCENE,
                                  WeedExtractionEnv)
-
-CONFIGS = Path(__file__).resolve().parents[1] / "configs"
-
-DRAG_TRAVEL = 0.025  # metres of drag that produces ROOT_BREAK_FORCE
-DRAG_STIFFNESS = ROOT_BREAK_FORCE / DRAG_TRAVEL
-DRAG_FORCE_CAP = 1.3 * ROOT_BREAK_FORCE  # a flick cannot hugely overshoot the root
+from weed_extraction.uproot import Uprooter
 
 
 def drag_force(model, data, pert):
     """The pull a mouse drag puts on a weed: a critically damped spring to the cursor."""
+    stiffness = ROOT_BREAK_FORCE / 0.025  # 25 mm of drag produces the break force
+    cap = 1.3 * ROOT_BREAK_FORCE  # a flick cannot hugely overshoot the root
     body = pert.select
     stretch = pert.refselpos - data.xipos[body]
-    damping = 2 * np.sqrt(DRAG_STIFFNESS * model.body_mass[body])  # critical: no ringing
-    force = DRAG_STIFFNESS * stretch - damping * data.cvel[body, 3:]
+    damping = 2 * np.sqrt(stiffness * model.body_mass[body])  # critical: no ringing
+    force = stiffness * stretch - damping * data.cvel[body, 3:]
     size = np.linalg.norm(force)
-    return force * (DRAG_FORCE_CAP / size) if size > DRAG_FORCE_CAP else force
+    return force * (cap / size) if size > cap else force
 
 
 @dataclass
@@ -68,6 +65,7 @@ def to_rgb(image):
 
 def view(cfg):
     """Interactive viewer. Ctrl+right-drag a weed to pull it out of the soil."""
+    # Imported here because it fails without GLFW, and capture runs headless.
     import mujoco.viewer
 
     # No camera rendering here: an offscreen frame of this scene costs ~200 ms,
@@ -94,7 +92,7 @@ def view(cfg):
                     d.xfrc_applied[pert.select, :3] = drag_force(m, d, pert)
                 mujoco.mj_step(m, d)
                 if root is not None:
-                    pulling, pull = pert.select, roots.axial_force(d, root)
+                    pulling, pull = pert.select, roots.wrench(d, root)[0]
                 for weed in roots.snap(d):
                     print(f"\nuprooted {weed} at {pull:.1f} N")
 
@@ -109,8 +107,7 @@ def view(cfg):
 
 def uproot(cfg):
     """Watch the arm do it: reach over the weed, take the stalk, twist, pull it out."""
-    import mujoco.viewer
-    from weed_extraction.uproot import Uprooter
+    import mujoco.viewer  # see view()
 
     env = make_env(cfg, cameras=[])
     m, d = env.model, env.data
@@ -169,12 +166,13 @@ def capture(cfg):
 
 def parse_config():
     """`weed-launch <config> [--key=value ...]`, where <config> is a path or a name in configs/."""
+    configs = Path(__file__).resolve().parents[1] / "configs"
     if len(sys.argv) < 2 or sys.argv[1].startswith("-"):
         sys.exit("usage: weed-launch <config> [--key=value ...]\nconfigs: "
-                 f"{', '.join(p.stem for p in sorted(CONFIGS.glob('*.yaml')))}")
+                 f"{', '.join(p.stem for p in sorted(configs.glob('*.yaml')))}")
     config = Path(sys.argv[1])
     if not config.exists():
-        config = CONFIGS / f"{sys.argv[1]}.yaml"
+        config = configs / f"{sys.argv[1]}.yaml"
     return draccus.parse(LaunchConfig, config_path=config, args=sys.argv[2:])
 
 

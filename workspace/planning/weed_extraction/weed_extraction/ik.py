@@ -13,25 +13,6 @@ import mink
 
 from weed_extraction.env import SCENE
 
-ARM = tuple(f"joint{i}" for i in range(1, 8))
-
-# How close things may come, in metres. The solver starts pushing back at APPROACH and
-# refuses to close past the clearance. The arm proper stays well off the field, but the
-# gripper is the tool: it has to reach the soil surface to take a stalk at its base, so
-# it gets a clearance of its own that is just thick enough to keep the pads off the bed.
-CLEARANCE = 0.015
-GRIPPER_CLEARANCE = 0.003
-APPROACH = 0.08
-
-# Panda datasheet joint speeds, rad/s. These are not decoration: collision avoidance is
-# a limit on velocity, so it only bites if the solver is stopped from taking a step big
-# enough to jump the APPROACH band in one go. Without them a solve to a distant target
-# will happily put the elbow through a bed on its way there.
-SPEED = {"joint1": 2.175, "joint2": 2.175, "joint3": 2.175, "joint4": 2.175,
-         "joint5": 2.610, "joint6": 2.610, "joint7": 2.610}
-
-UP = np.array([0.0, 0.0, 1.0])
-
 
 def ik_model(scene=SCENE):
     """The scene with the plants removed: robot, ground and beds only.
@@ -62,7 +43,7 @@ def pose(position, approach, twist=0.0):
     # `across` is the direction the fingers open along, always horizontal so they close
     # across an upright stalk. Its sign rolls the wrist so the hand's instrument face --
     # and the D435i bolted to it -- looks up rather than down into the soil.
-    across = np.cross(forward, UP)
+    across = np.cross(forward, [0.0, 0.0, 1.0])
     length = np.linalg.norm(across)
     across = np.array([1.0, 0.0, 0.0]) if length < 1e-9 else across / length
     frame = np.column_stack([np.cross(across, forward), across, forward])
@@ -79,6 +60,20 @@ class ArmIK:
     would hide every genuinely unreachable target.
     """
 
+    ARM = tuple(f"joint{i}" for i in range(1, 8))
+
+    # How close things may come, in metres. The solver starts pushing back at APPROACH
+    # and refuses to close past the clearance. The gripper has to reach the soil to take
+    # a stalk at its base, so its clearance is just thick enough to keep the pads off it.
+    CLEARANCE = 0.015
+    GRIPPER_CLEARANCE = 0.003
+    APPROACH = 0.08
+
+    # Panda datasheet joint speeds, rad/s. Collision avoidance is a limit on velocity, so
+    # without these one step can jump the APPROACH band and put the elbow through a bed.
+    SPEED = {"joint1": 2.175, "joint2": 2.175, "joint3": 2.175, "joint4": 2.175,
+             "joint5": 2.610, "joint6": 2.610, "joint7": 2.610}
+
     def __init__(self, scene=SCENE):
         self.model = ik_model(scene)
         self.configuration = mink.Configuration(self.model)
@@ -88,12 +83,12 @@ class ArmIK:
         # the target: at cost 1e-2 the solve settles 0.3 mm out and never closes.
         self.posture = mink.PostureTask(self.model, cost=1e-4)
         self.limits = [mink.ConfigurationLimit(self.model),
-                       mink.VelocityLimit(self.model, SPEED), *self._avoid()]
+                       mink.VelocityLimit(self.model, self.SPEED), *self._avoid()]
         frozen = [j for j in range(self.model.njnt)
-                  if self.model.joint(j).name not in ARM]
+                  if self.model.joint(j).name not in self.ARM]
         self.frozen = mink.DofFreezingTask(
             self.model, dof_indices=[self.model.jnt_dofadr[j] for j in frozen])
-        self.arm_qpos = [self.model.jnt_qposadr[self.model.joint(n).id] for n in ARM]
+        self.arm_qpos = [self.model.jnt_qposadr[self.model.joint(n).id] for n in self.ARM]
 
     def _avoid(self):
         """What must not touch what: the arm off the field, the wrist off the shoulder.
@@ -116,10 +111,10 @@ class ArmIK:
         field = [self.model.geom(n).id for n in ("path", "bed1", "bed2")]
         limit = lambda pairs, clearance: mink.CollisionAvoidanceLimit(
             self.model, geom_pairs=pairs, minimum_distance_from_collisions=clearance,
-            collision_detection_distance=APPROACH)
+            collision_detection_distance=self.APPROACH)
         return [limit([(links, field), (geoms("link5", "link6", "link7"), shoulder)],
-                      CLEARANCE),
-                limit([(gripper, field), (gripper, shoulder)], GRIPPER_CLEARANCE)]
+                      self.CLEARANCE),
+                limit([(gripper, field), (gripper, shoulder)], self.GRIPPER_CLEARANCE)]
 
     def _clamped(self, qpos):
         """The robot's joint angles, pulled back inside their limits.
@@ -155,9 +150,3 @@ class ArmIK:
             if np.linalg.norm(error[:3]) < tolerance:
                 break
         return self.configuration.q[self.arm_qpos].copy(), np.linalg.norm(error[:3])
-
-    def site_position(self, qpos):
-        """Where `grasp_site` sits for a given configuration."""
-        self.configuration.update(self._clamped(qpos))
-        return self.configuration.get_transform_frame_to_world(
-            "grasp_site", "site").translation()

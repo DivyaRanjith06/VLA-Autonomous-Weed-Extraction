@@ -29,8 +29,9 @@ Pick one path. You do not need both.
 **Natively** — macOS, Linux or Windows (WSL):
 
 - [git](https://git-scm.com/downloads)
-- [Python 3.12 or newer](https://www.python.org/downloads/) — Ubuntu:
-  `sudo apt install git python3.12 python3.12-venv`, macOS: `brew install git python@3.12`
+- [Python 3.12 or newer](https://www.python.org/downloads/) — Ubuntu 22.04:
+  install it from the [Deadsnakes PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa),
+  then install `python3.12-venv`; macOS: `brew install git python@3.12`
 
 Everything else installs into a virtualenv inside the repo. Nothing touches your system
 Python.

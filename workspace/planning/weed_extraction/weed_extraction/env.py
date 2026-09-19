@@ -6,6 +6,7 @@ import gymnasium as gym
 import mujoco
 import numpy as np
 
+# Module level: ik, launch and the tests import these.
 SCENE = (
     Path(__file__).resolve().parents[3]
     / "application"
@@ -85,42 +86,29 @@ class Roots:
         eq = self.of_body.get(body_id)
         return eq if eq is not None and data.eq_active[eq] else None
 
-    def _rows(self, data, eq):
-        """The weld's six constraint rows: three of force, then three of torque."""
-        n = data.nefc
-        is_eq = data.efc_type[:n] == mujoco.mjtConstraint.mjCNSTR_EQUALITY
-        rows = np.flatnonzero(is_eq & (data.efc_id[:n] == eq))
-        return rows if len(rows) == 6 else None
+    def wrench(self, data, eq):
+        """Newtons pulling the weed out along its own axis, and newton-metres twisting it.
 
-    def axial_force(self, data, eq):
-        """Newtons drawing the weed out of the soil along its own axis.
-
-        Sideways load is excluded, and so is downward: pressing a plant into the
-        ground is not a way to uproot it.
+        Sideways and downward load are excluded: neither draws a plant out of the soil.
         """
-        rows = self._rows(data, eq)
-        if rows is None:
-            return 0.0
-        # efc_force is the constraint's reaction, so it opposes the pull: an upward
-        # pull shows as a downward reaction, hence the sign.
-        return max(0.0, -float(np.dot(data.efc_force[rows[:3]], self.up[eq])))
-
-    def torsion(self, data, eq):
-        """Newton-metres twisting the weed about its own axis, either way round."""
-        rows = self._rows(data, eq)
-        if rows is None:
-            return 0.0
-        return abs(float(np.dot(data.efc_force[rows[3:]], self.up[eq])))
+        # Equality rows come first in the constraint list, six per active weld:
+        # three of force, then three of torque.
+        rows = np.flatnonzero(data.efc_id[:data.ne] == eq)
+        if len(rows) != 6:
+            return 0.0, 0.0
+        # efc_force is the reaction, so an upward pull shows as a downward force.
+        force = data.efc_force[rows]
+        up = self.up[eq]
+        return max(0.0, -float(force[:3] @ up)), abs(float(force[3:] @ up))
 
     def load(self, data, eq):
         """How close the root is to failing, as a fraction of its capacity.
 
-        Tension and torsion share one linear interaction criterion, so a twist that
-        is not enough to shear the root on its own still lowers the pull needed to
-        draw it out -- which is why twisting a weed loose works.
+        Tension and torsion share one linear criterion, so a twist too small to shear
+        the root still lowers the pull needed to draw it out.
         """
-        return (self.axial_force(data, eq) / ROOT_BREAK_FORCE
-                + self.torsion(data, eq) / ROOT_BREAK_TORQUE)
+        pull, twist = self.wrench(data, eq)
+        return pull / ROOT_BREAK_FORCE + twist / ROOT_BREAK_TORQUE
 
     def snap(self, data, threshold=1.0):
         """Release weeds loaded past `threshold` for long enough, and name them."""

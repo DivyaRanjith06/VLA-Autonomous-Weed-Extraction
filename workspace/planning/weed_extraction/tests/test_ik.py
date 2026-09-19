@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from weed_extraction.env import WeedExtractionEnv
-from weed_extraction.ik import ARM, CLEARANCE, ArmIK, ik_model, pose
+from weed_extraction.ik import ArmIK, ik_model, pose
 
 DOWN = [0.0, 0.0, -1.0]
 SIDEWAYS = [0.0, -1.0, 0.0]
@@ -25,7 +25,7 @@ def env():
 def test_ik_model_has_the_robot_and_the_field_but_no_plants():
     model = ik_model()
     assert model.nq == model.nv == 10  # the rail, 7 arm joints, 2 fingers
-    assert [model.joint(j).name for j in range(model.njnt)][1:8] == list(ARM)
+    assert [model.joint(j).name for j in range(model.njnt)][1:8] == list(ArmIK.ARM)
     bodies = [model.body(b).name for b in range(model.nbody)]
     assert not [b for b in bodies if "sowthistle" in b or "shepherd" in b
                 or "strawberry" in b]
@@ -69,7 +69,7 @@ def test_the_solution_keeps_the_arm_out_of_the_field(ik, env):
     # far mesh-against-box pair instead of the range, which reads as a collision.
     closest = min(mujoco.mj_geomDistance(model, data, a, b, 0.3, None)
                   for a in links for b in field)
-    assert closest > CLEARANCE * 0.9
+    assert closest > ArmIK.CLEARANCE * 0.9
 
 
 def test_the_base_and_fingers_are_never_moved_by_ik(ik, env):
@@ -78,7 +78,7 @@ def test_the_base_and_fingers_are_never_moved_by_ik(ik, env):
     weed = env.data.xpos[env.model.body("shepherd_1").id]
     ik.solve(env.data.qpos, pose(weed + [0, 0, 0.12], DOWN))
     after = ik.configuration.q
-    held = [j for j in range(ik.model.njnt) if ik.model.joint(j).name not in ARM]
+    held = [j for j in range(ik.model.njnt) if ik.model.joint(j).name not in ArmIK.ARM]
     rows = ik.model.jnt_qposadr[held]
     assert np.allclose(before[rows], after[rows], atol=1e-9)
 
