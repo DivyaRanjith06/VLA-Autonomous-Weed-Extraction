@@ -1,5 +1,5 @@
 <mujoco model="mobile_panda">
-  <compiler angle="radian" meshdir="../../hardware/mujoco_menagerie/franka_emika_panda/assets" autolimits="true"/>
+  <compiler angle="radian" meshdir="../../hardware/mujoco_menagerie/franka_emika_panda/assets" autolimits="true" fitaabb="true"/>
 
   <option integrator="implicitfast"/>
 
@@ -277,7 +277,7 @@
                         <geom mesh="d435i_6" material="Black_Acrylic"/>
                         <geom mesh="d435i_7" material="RGB_Pupil"/>
                         <geom mesh="d435i_8" material="Metal_Casing" mass="0.072"/>
-                        <geom type="capsule" mesh="d435i_8" group="3" contype="1" conaffinity="1"/>
+                        <geom type="box" mesh="d435i_8" group="3" contype="1" conaffinity="1"/>
                         <camera name="d435i_color" pos="0.0325 0 -0.0042" xyaxes="-1 0 0 0 1 0" fovy="42" resolution="1920 1080"/>
                         <camera name="d435i_depth" pos="0.0175 0 -0.0042" xyaxes="-1 0 0 0 1 0" fovy="58" resolution="1280 720"/>
                       </body>
