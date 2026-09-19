@@ -65,7 +65,9 @@ def test_the_solution_keeps_the_arm_out_of_the_field(ik, env):
              for g in range(model.ngeom)
              if model.geom_bodyid[g] == model.body(f"link{i}").id
              and (model.geom_contype[g] or model.geom_conaffinity[g])]
-    closest = min(mujoco.mj_geomDistance(model, data, a, b, 1.0, None)
+    # 0.3 m, not 1.0: asked for a range that wide, mj_geomDistance returns 0.0 for a
+    # far mesh-against-box pair instead of the range, which reads as a collision.
+    closest = min(mujoco.mj_geomDistance(model, data, a, b, 0.3, None)
                   for a in links for b in field)
     assert closest > CLEARANCE * 0.9
 

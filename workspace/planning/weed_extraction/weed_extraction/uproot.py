@@ -1,4 +1,4 @@
-"""Scripted extraction of one weed: reach in, take the stalk, twist, pull.
+"""Scripted extraction of one weed: reach in, take the stalk, twist, pull, bin it.
 
 The gripper comes in on the stalk from the side rather than down its own axis, closes
 across it, turns about the world vertical and lifts. Turning about the vertical is what
@@ -24,6 +24,7 @@ GRASP_HEIGHT = 0.016
 STANDOFF = 0.14         # metres back from the stalk to line up before reaching in
 HEADROOM = 0.07         # metres above the plant's own tip to line up, clear of its leaves
 LIFT = 0.25             # metres to raise the weed once it is held
+DROP = 0.20             # metres above the bin to let go, clear of its rim
 # How far to turn the stalk. Small, because the grasp is rigid: the arm turns the plant
 # against a stiff root and the torque climbs with the angle, so anything past about 15
 # shears the root on the twist alone. At 10 the twist carries two thirds of the root's
@@ -98,8 +99,8 @@ class Uprooter:
             ("grip", 1.0, lambda t: (self.grip, between(OPEN, SHUT, t), 0.0)),
             ("twist", 2.0, lambda t: (self.grip, SHUT, TWIST * smoothstep(t))),
             ("lift", 3.0, lambda t: (between(self.grip, lifted, t), SHUT, TWIST)),
-            ("retreat", 3.0, lambda t: (between(lifted, standoff + [0, 0, LIFT], t),
-                                        SHUT if t < 0.8 else OPEN, TWIST)),
+            ("carry", 3.0, lambda t: (between(lifted, self.over_bin, t), SHUT, TWIST)),
+            ("drop", 1.5, lambda t: (self.over_bin, OPEN, TWIST)),
         ]
         self.phase, self.elapsed = 0, 0.0
         self.peak_load = self.peak_pull = self.peak_twist = 0.0
@@ -109,6 +110,13 @@ class Uprooter:
         # during the reach. Re-deriving a target every tick is what made it pace back
         # and forth, because the phase clock restarts at every phase.
         env.data.ctrl[env.model.actuator("base_x").id] = self.grip[0]
+
+    @property
+    def over_bin(self):
+        """Above the mouth of the bin. Read live: the bin rides on the base, which is
+        still driving to the weed when the sequence is built."""
+        model, data = self.env.model, self.env.data
+        return data.xpos[model.body("bin").id] + [0, 0, DROP]
 
     @property
     def captured(self):

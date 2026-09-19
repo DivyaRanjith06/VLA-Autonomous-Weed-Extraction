@@ -193,7 +193,7 @@ def test_a_stem_off_centre_in_the_jaws_is_still_held(env, ik):
     """The arm settles 0.23 mm to one side of sowthistle_2, so only one pad reaches it."""
     runner = Uprooter(env, "sowthistle_2", ik=ik)
     held_during_lift = []
-    while (name := runner.step()) not in (None, "retreat"):
+    while (name := runner.step()) not in (None, "carry"):
         env.step(env.data.ctrl)
         if name == "lift":
             held_during_lift.append(runner.holding)
