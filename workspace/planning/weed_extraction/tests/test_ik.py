@@ -18,6 +18,9 @@ def ik():
 def env():
     env = WeedExtractionEnv(cameras=())
     env.reset()
+    # Home is the near end of the beds; these tests aim at shepherd_1, so park beside it.
+    env.data.qpos[env.model.joint("base_slide_x").qposadr[0]] = 0.0
+    mujoco.mj_forward(env.model, env.data)
     yield env
     env.close()
 

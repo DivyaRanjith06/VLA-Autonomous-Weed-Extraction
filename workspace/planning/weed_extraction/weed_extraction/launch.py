@@ -39,7 +39,7 @@ class LaunchConfig:
     cameras: list[str] = field(default_factory=lambda: ["d435i_color", "d435i_depth"])  # capture only
     width: int = 640
     height: int = 360
-    base_x: float = 0.0  # base target along the bed, metres
+    base_x: float = -1.7  # base target along the bed, metres; -1.7 is the near end of the beds
     control_hz: int = 20  # how often the controller writes actuator targets
     weed: str = "shepherd_1"  # uproot: which weed to pull
     settle_s: float = 2.0  # capture: simulated seconds before the frame is taken

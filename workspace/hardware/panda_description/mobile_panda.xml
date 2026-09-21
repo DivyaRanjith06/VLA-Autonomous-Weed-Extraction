@@ -356,7 +356,8 @@
   </actuator>
 
   <keyframe>
-    <key name="home" qpos="0 0 0 0 -1.57079 0 1.57079 -0.7853 0.04 0.04" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255 0"/>
+    <!-- The base starts at the near end of the beds (x = -1.7), so a run down the walkway covers them end to end. -->
+    <key name="home" qpos="-1.7 0 0 0 -1.57079 0 1.57079 -0.7853 0.04 0.04" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255 -1.7"/>
   </keyframe>
 
   <contact>

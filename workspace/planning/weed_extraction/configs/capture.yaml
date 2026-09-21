@@ -4,6 +4,6 @@ mode: capture
 cameras: [rgb_camera, d435i_color, d435i_depth]
 width: 1280
 height: 720
-base_x: 0.0
+base_x: -1.7
 settle_s: 2.0
 output_dir: outputs
