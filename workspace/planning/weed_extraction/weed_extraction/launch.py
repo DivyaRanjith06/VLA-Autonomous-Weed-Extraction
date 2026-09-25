@@ -17,6 +17,7 @@ import numpy as np
 
 from weed_extraction.env import (ROOT_BREAK_FORCE, ROOT_BREAK_TORQUE, SCENE,
                                  WeedExtractionEnv)
+from weed_extraction.scene import Manifest, build_env
 from weed_extraction.uproot import Uprooter
 
 
@@ -36,6 +37,8 @@ def drag_force(model, data, pert):
 class LaunchConfig:
     mode: str = "view"  # view: interactive viewer; capture: one frame per camera; uproot: scripted
     scene: Path = SCENE
+    seed: int | None = None  # sample a scene from this seed instead of loading `scene`
+    family: str | None = None  # with seed: which scene family; drawn from the seed if unset
     cameras: list[str] = field(default_factory=lambda: ["d435i_color", "d435i_depth"])  # capture only
     width: int = 640
     height: int = 360
@@ -48,8 +51,16 @@ class LaunchConfig:
 
 
 def make_env(cfg, cameras, scale=1):
-    env = WeedExtractionEnv(cfg.scene, cameras, cfg.width * scale, cfg.height * scale,
-                            control_hz=cfg.control_hz)
+    args = dict(cameras=cameras, width=cfg.width * scale, height=cfg.height * scale,
+                control_hz=cfg.control_hz)
+    if cfg.seed is None:
+        env = WeedExtractionEnv(cfg.scene, **args)
+    else:
+        manifest = Manifest.sample(cfg.seed, cfg.family)
+        env = build_env(manifest, cfg.output_dir / "scenes" / f"{manifest.family}_{cfg.seed}",
+                        **args)
+        print(f"{manifest.family} scene from seed {cfg.seed}, written to {env.scene.parent}; "
+              f"weeds: {', '.join(p.name for p in manifest.weeds)}")
     env.reset()
     env.data.ctrl[env.model.actuator("base_x").id] = cfg.base_x
     return env
@@ -93,13 +104,14 @@ def view(cfg):
                 mujoco.mj_step(m, d)
                 if root is not None:
                     pulling, pull = pert.select, roots.wrench(d, root)[0]
+                    capacity = ROOT_BREAK_FORCE * roots.strength[root]
                 for weed in roots.snap(d):
                     print(f"\nuprooted {weed} at {pull:.1f} N")
 
             if pulling is not None and frame_start >= next_readout:
                 next_readout = frame_start + 0.1  # one self-overwriting line at 10 Hz
                 print(f"  pulling {m.body(pulling).name} -- root feels {pull:5.1f} N "
-                      f"of {ROOT_BREAK_FORCE:.0f} N", end="\r", flush=True)
+                      f"of {capacity:.0f} N", end="\r", flush=True)
             viewer.sync()
             time.sleep(max(0.0, substeps * m.opt.timestep - (time.time() - frame_start)))
     env.close()
@@ -112,9 +124,10 @@ def uproot(cfg):
     env = make_env(cfg, cameras=[])
     m, d = env.model, env.data
     runner = Uprooter(env, cfg.weed)
+    strength = env.roots.strength[runner.root]
     print(f"{cfg.weed}: stalk at {np.round(runner.grip, 3)}, "
-          f"root gives way at {ROOT_BREAK_FORCE:.0f} N of pull or "
-          f"{ROOT_BREAK_TORQUE:.2f} N.m of twist, or any mix of the two")
+          f"root gives way at {ROOT_BREAK_FORCE * strength:.1f} N of pull or "
+          f"{ROOT_BREAK_TORQUE * strength:.3f} N.m of twist, or any mix of the two")
     phase = None
 
     with mujoco.viewer.launch_passive(m, d) as viewer:

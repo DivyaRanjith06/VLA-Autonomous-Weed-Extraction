@@ -109,9 +109,9 @@ One autonomous cycle, repeated for every weed:
 
 ## 3. Scope and Architecture
 
-**In scope:** MuJoCo simulation only — robot and field models, plant physics, perception on rendered images, base and arm control, grasp and extraction logic, an orchestrating state machine. Optional episode logging via the vendored `lerobot`.
+**In scope:** MuJoCo simulation only — robot and field models, plant physics, perception on rendered images, base and arm control, grasp and extraction logic, an orchestrating state machine. Generating scripted demonstrations, packing them as a LeRobot dataset, and fine-tuning SmolVLA on them through the vendored `lerobot`.
 
-**Out of scope for now:** real hardware, sim-to-real, training large VLA models.
+**Out of scope for now:** real hardware, sim-to-real, training VLA models from scratch.
 
 ### Workspace layout (mandated)
 
@@ -130,20 +130,25 @@ workspace/
     └── weed_extraction/      the Python package
 ```
 
-**Path rule** (verified, MuJoCo 3.8.1): `include` files, and any `meshdir` set inside one, resolve relative to the **top-level scene file**. So `mobile_panda.xml`'s `meshdir` is written relative to `workspace/application/field_description/`, and mesh paths in `weeds.xml` are written relative to that inherited `meshdir` (four levels up). Textures resolve relative to the scene file instead. The scene compiles from any working directory.
+**Path rule** (verified on MuJoCo 3.8.1, and still holding on 3.13.0, the pinned version): `include` files, and any `meshdir` set inside one, resolve relative to the **top-level scene file**. So `mobile_panda.xml`'s `meshdir` is written relative to `workspace/application/field_description/`, and mesh paths in `weeds.xml` are written relative to that inherited `meshdir` (four levels up). Textures resolve relative to the scene file instead. The scene compiles from any working directory.
 
 ## 4. Current Repository Structure
 
 ```
 VLA-Weed-Extraction/
-├── README.md                 human-facing: native setup, then Docker
+├── README.md                 human-facing: setup, dataset building, SmolVLA training setup
 ├── CLAUDE.md                 this file
-├── Dockerfile                Ubuntu 24.04 + ROS 2 Jazzy, MuJoCo + LeRobot
-├── docs/scene.png            README screenshot
+├── Dockerfile                Ubuntu 24.04 + ROS 2 Jazzy, MuJoCo; LeRobot with --build-arg WITH_SMOLVLA=true
+├── docs/
+│   ├── scene.png                        README screenshot
+│   ├── vla_training_automation_plan.md  the SmolVLA plan (single source of truth)
+│   └── smolvla_data_collection.md       retired, points to the plan
 ├── run_scripts/
+│   ├── setup.sh              native venv setup; --smolvla adds LeRobot and the smolvla extra
 │   ├── simulate.sh           launcher; works natively and inside the container
 │   └── test_up_root.sh       scripted grasp-twist-pull demo in the viewer
-├── docker_scripts/run_scripts/   build, base, devel, up, enter_bash, stop
+├── docker_scripts/run_scripts/   build (passes --build-arg), base, devel, up, enter_bash, stop
+├── outputs/                  generated scenes and datasets; git-ignored
 └── workspace/
     ├── hardware/
     │   ├── mujoco_menagerie/         submodule @ 71f066a
@@ -153,7 +158,7 @@ VLA-Weed-Extraction/
     │   ├── scene_mobile_field.xml    ACTIVE SCENE
     │   ├── weeds.xml                 the 8 weeds, included by the scene
     │   └── assets/
-    │       ├── ground/               grass + soil textures (Poly Haven, CC0)
+    │       ├── ground/               grass + soil textures (Poly Haven, CC0); variants/ for sampled scenes
     │       └── plants/{strawberry,sowthistle,shepherd}/
     │           ├── *_plant.png       texture
     │           ├── bands/            visual mesh, one per stalk segment
@@ -161,15 +166,72 @@ VLA-Weed-Extraction/
     └── planning/
         ├── lerobot/                  submodule @ bad0260 (v0.6.1)
         └── weed_extraction/
-            ├── weed_extraction/{__init__,env,ik,launch,uproot}.py
+            ├── pyproject.toml        pinned deps; extras: dev, smolvla
+            ├── weed_extraction/
+            │   ├── env.py            Gymnasium env, breakable roots, explicit grasp weld
+            │   ├── ik.py             collision-aware arm IK (mink), built per scene
+            │   ├── uproot.py         scripted expert: reach, grip, twist, lift, carry, drop
+            │   ├── launch.py         weed-launch: view, capture, uproot; --seed for sampled scenes
+            │   ├── scene.py          manifests, six scene families, placement rules, MJCF templating
+            │   ├── prompts.py        language prompts and the weeds each one names
+            │   ├── recovery.py       bounded grasp and extraction retries, attempt labels
+            │   ├── recorder.py       causal episode recording to observations.npz + episode.json
+            │   ├── validate.py       episode acceptance checks and rejection reasons
+            │   ├── generate.py       planning and process-isolated parallel generation
+            │   ├── pack.py           LeRobot Dataset v3 packing and inspection
+            │   ├── dataset.py        chunked build: generate, pack, check, prune, merge
+            │   └── policy.py         SmolVLA input boundary: depth step, features, model directory
             ├── configs/{view,capture,uproot}.yaml
-            └── tests/{test_scene,test_env,test_ik,test_uproot}.py
+            └── tests/                13 files: test_scene (the MJCF), test_manifest (scene.py), one per other module but launch.py
 ```
 
 ### Active scene: `workspace/application/field_description/scene_mobile_field.xml`
 
 Includes `mobile_panda.xml` (robot) and `weeds.xml` (weeds). Owns the beds, the walking path, lighting, the 8 strawberries and the overview camera.
 
-Compiled size: `nq=114 nv=106 nu=9 nbody=54 ngeom=375 nmesh=145 neq=9 ncam=3`.
+Compiled size: `nq=114 nv=106 nu=9 nbody=55 ngeom=389 nmesh=146 neq=17 ncam=3`.
 
 Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-person overview. `d435i_color` and `d435i_depth` — the RealSense D435i on the wrist, declared inside `mobile_panda.xml`.
+
+## 5. Dataset and Policy Pipeline
+
+`python -m weed_extraction.dataset <out_dir>` runs the whole pipeline, in chunks that fit the disk:
+
+1. **Plan**: 4 episodes in each of the 20 training scenes and 1 in each of the 10 held-out scenes, 90 in all. Each episode is one single-target prompt, balanced over the prompt kinds each scene offers.
+2. **Generate**: one worker process per episode. The recorder reads the state before each action, then the expert (with recovery) acts. Validation then accepts or rejects the episode with a reason.
+3. **Pack**: each chunk is packed to LeRobot v3 and inspected against its raw frames. The accepted raw frames are then deleted; they can be regenerated deterministically.
+4. **Merge**: one dataset per split, checked against its chunks.
+
+Splits: `held_out_family` is all of evening_cool. `held_out_variant` is variant 4 of the other five families. `train` is everything else.
+
+Current build (`outputs/dataset_v1`): 70 / 5 / 4 accepted episodes (68,800 / 4,750 / 3,800 frames). 11 were rejected: 10 for crop contact, 1 for a tray drop.
+
+Policy interface:
+- `observation.state` has 28 values: 10 joint positions, 10 velocities, a 7-value end-effector pose and the gripper width.
+- Images: wrist RGB, wrist depth and overview RGB, each 144×256.
+- The language prompt.
+- `action` has 9 targets: 7 joints, the gripper and the rail.
+
+The depth is stored in metres. `policy.DepthToRGBProcessorStep` heads SmolVLA's preprocessor and converts it: over 2 m, clipped, into 3 channels. Its settings are saved with the preprocessor.
+
+`label.*` (root wrench, phase, attempt, held, uprooted) is never a policy input.
+
+`python -m weed_extraction.policy` writes the `lerobot/smolvla_base` model directory. Train with `lerobot_train.py --policy.path=<dir> --env.discover_packages_path=weed_extraction`.
+
+## 6. Maintenance Protocol
+
+After every completed implementation step, update this file: structure, pipeline, and the state below. Remove claims that stopped being true rather than appending corrections.
+
+**State (2026-09-25):**
+- 230 tests pass, about 20 minutes. Tests needing the `smolvla` extra skip without it.
+- Pinned: MuJoCo 3.13.0, mink 1.3.0; the `smolvla` extra pins torch 2.11.0, transformers 5.5.4 and datasets 4.8.5.
+- The pre-training dataset is built and verified. SmolVLA training has not been run beyond a few smoke-test steps.
+
+**Known deviations from the plan:**
+- 50 Hz recording, not 20 fps.
+- Single-target prompts only.
+- Tray-drop failures are detected, not retried.
+- Crop safety is measured as contact, and the expert cannot see crops.
+- Target occlusion is not measured.
+- The root wrench is a label, not a wrist force/torque sensor.
+- Held-out evaluation has not been run.

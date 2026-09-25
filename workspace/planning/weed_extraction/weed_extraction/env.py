@@ -60,9 +60,13 @@ class Roots:
 
     SUSTAIN = 0.02  # seconds the pull must be held before the root gives way
 
-    def __init__(self, model):
+    def __init__(self, model, break_force=ROOT_BREAK_FORCE, break_torque=ROOT_BREAK_TORQUE):
         self.model = model
+        self.break_force = break_force
+        self.break_torque = break_torque
         self.eqs = [i for i in range(model.neq) if (model.eq(i).name or "").endswith("_root")]
+        # Each root's capacity against the break force and torque: a deeper root holds more.
+        self.strength = dict.fromkeys(self.eqs, 1.0)
         self.base = {i: model.body(model.eq(i).name.removesuffix("_root")).id for i in self.eqs}
         # Grabbing a plant anywhere pulls on the same root, so map its whole subtree.
         self.of_body = {b: i for i in self.eqs for b in range(model.nbody)
@@ -108,7 +112,8 @@ class Roots:
         the root still lowers the pull needed to draw it out.
         """
         pull, twist = self.wrench(data, eq)
-        return pull / ROOT_BREAK_FORCE + twist / ROOT_BREAK_TORQUE
+        strength = self.strength[eq]
+        return pull / (self.break_force * strength) + twist / (self.break_torque * strength)
 
     def snap(self, data, threshold=1.0):
         """Release weeds loaded past `threshold` for long enough, and name them."""
@@ -229,7 +234,14 @@ class WeedExtractionEnv(gym.Env):
         control_hz=20,
         max_steps=500,
         render_mode=None,
+        root_strength=None,
     ):
+        # The scene is compiled once, here. Another layout means another environment:
+        # see weed_extraction.scene.build_env.
+        self.scene = Path(scene)
+        # Weed name -> factor on its root's break force and torque, used by every reset
+        # that does not name its own.
+        self.root_strength = dict(root_strength or {})
         self.model = mujoco.MjModel.from_xml_path(str(scene))
         self.data = mujoco.MjData(self.model)
         self.cameras = list(cameras)
@@ -259,9 +271,23 @@ class WeedExtractionEnv(gym.Env):
         self.observation_space = gym.spaces.Dict(spaces)
 
     def reset(self, *, seed=None, options=None):
+        """Robot home, weeds replanted, roots set for the episode.
+
+        `seed` only seeds `self.np_random`; nothing here draws from it. It does not
+        change the scene, which was fixed when the environment was built.
+        """
         super().reset(seed=seed)
+        options = options or {}
         reset_to_home(self.model, self.data)
         self.roots.forget()
+        # Per episode, not sticky: a reset without options goes back to the defaults.
+        self.roots.break_force = options.get("break_force", ROOT_BREAK_FORCE)
+        self.roots.break_torque = options.get("break_torque", ROOT_BREAK_TORQUE)
+        strength = options.get("root_strength", self.root_strength)
+        roots = {self.model.eq(eq).name.removesuffix("_root"): eq for eq in self.roots.eqs}
+        if unknown := set(strength) - set(roots):
+            raise ValueError(f"no such weeds: {sorted(unknown)}")
+        self.roots.strength = {eq: strength.get(name, 1.0) for name, eq in roots.items()}
         self.grasp.let_go(self.data)
         self._steps = 0
         return self.get_obs(), {}

@@ -7,6 +7,8 @@ constraints, so a solution that would drive the arm into the soil or fold it int
 itself is never returned in the first place.
 """
 
+from pathlib import Path
+
 import mujoco
 import numpy as np
 import mink
@@ -75,6 +77,7 @@ class ArmIK:
              "joint5": 2.610, "joint6": 2.610, "joint7": 2.610}
 
     def __init__(self, scene=SCENE):
+        self.scene = Path(scene)  # whose beds the arm is kept out of
         self.model = ik_model(scene)
         self.configuration = mink.Configuration(self.model)
         self.task = mink.FrameTask("grasp_site", "site", position_cost=1.0,

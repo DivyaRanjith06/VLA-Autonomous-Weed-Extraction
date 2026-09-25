@@ -1,10 +1,17 @@
 #!/bin/bash
 # One-time native setup: the Panda meshes and a virtualenv with the package in it.
+# --smolvla also installs LeRobot and what dataset packing and SmolVLA training need.
 
 set -e
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+with_smolvla=false
+[[ "${1:-}" == "--smolvla" ]] && with_smolvla=true
+
 git submodule update --init workspace/hardware/mujoco_menagerie
+if $with_smolvla; then
+	git submodule update --init workspace/planning/lerobot
+fi
 python_bin="${PYTHON_BIN:-}"
 if [[ -z "$python_bin" ]]; then
 	for candidate in python3.14 python3.13 python3.12; do
@@ -40,4 +47,10 @@ fi
 
 echo "Creating .venv with $python_bin (Python $python_version)..."
 "$python_bin" -m venv .venv
-.venv/bin/pip install -e "workspace/planning/weed_extraction[dev]"
+if $with_smolvla; then
+	.venv/bin/pip install -e "workspace/planning/weed_extraction[dev,smolvla]"
+	# LeRobot from the submodule; its dependencies are the pinned smolvla extra above.
+	.venv/bin/pip install --no-deps -e workspace/planning/lerobot
+else
+	.venv/bin/pip install -e "workspace/planning/weed_extraction[dev]"
+fi

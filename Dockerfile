@@ -45,7 +45,16 @@ ENV PATH=/opt/venv/bin:$PATH
 # it, and then the mounted source is what runs.
 COPY workspace $WORKSPACE/workspace
 
-RUN pip install --no-cache-dir -e "$WORKSPACE/workspace/planning/weed_extraction[dev]"
+# build.sh --build-arg WITH_SMOLVLA=true adds LeRobot and the dataset/SmolVLA libraries
+# (the smolvla extra); LeRobot comes from its submodule, with --no-deps for the same reason
+# as in run_scripts/setup.sh.
+ARG WITH_SMOLVLA=false
+RUN if [ "$WITH_SMOLVLA" = true ]; then \
+        pip install --no-cache-dir -e "$WORKSPACE/workspace/planning/weed_extraction[dev,smolvla]" \
+        && pip install --no-cache-dir --no-deps -e "$WORKSPACE/workspace/planning/lerobot"; \
+    else \
+        pip install --no-cache-dir -e "$WORKSPACE/workspace/planning/weed_extraction[dev]"; \
+    fi
 
 # MUJOCO_GL is deliberately unset: MuJoCo picks GLFW when a display is forwarded and
 # EGL when there is none, so one image serves both.

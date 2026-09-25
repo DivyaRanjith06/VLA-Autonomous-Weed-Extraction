@@ -73,7 +73,10 @@ class Uprooter:
 
     def __init__(self, env, weed="shepherd_1", ik=None):
         self.env, self.weed = env, weed
-        self.ik = ik or ArmIK()
+        # The IK keeps the arm out of the beds, so it has to know where this scene's are.
+        self.ik = ik or ArmIK(env.scene)
+        if self.ik.scene.resolve() != env.scene.resolve():
+            raise ValueError(f"IK was built for {self.ik.scene}, not this scene {env.scene}")
         self.root = env.roots.of_body[env.model.body(weed).id]
         self.dt = env.n_substeps * env.model.opt.timestep
         self.grip = stem_centre(env.model, env.data, weed, self.GRASP_HEIGHT)

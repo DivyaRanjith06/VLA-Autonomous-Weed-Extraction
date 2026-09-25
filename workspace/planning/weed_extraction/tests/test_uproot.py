@@ -226,3 +226,63 @@ def test_the_arm_never_drives_into_the_beds_or_the_ground(env, ik):
                     culprit = (round(env.data.time, 2),
                                model.body(next(iter(bodies & arm))).name)
     assert deepest < 0.002, f"arm {1000 * deepest:.1f} mm into the field at {culprit}"
+
+
+@pytest.mark.parametrize("break_force", [15.0, 17.5, 20.0])
+def test_the_root_gives_way_at_the_break_force_set_on_reset(env, break_force):
+    env.reset(options={"break_force": break_force})
+    axis = env.roots.up[env.roots.of_body[env.model.body(WEED).id]]
+    _, below = hold(env, WEED, force=0.9 * break_force * axis, seconds=1.0)
+    assert not below
+    env.reset(options={"break_force": break_force})
+    _, above = hold(env, WEED, force=1.1 * break_force * axis, seconds=1.0)
+    assert above
+
+
+@pytest.mark.parametrize("break_force", [15.0, 17.5, 20.0])
+def test_load_uses_the_values_set_on_reset(env, break_force):
+    env.reset(options={"break_force": break_force, "break_torque": 0.05})
+    root = env.roots.of_body[env.model.body(WEED).id]
+    hold(env, WEED, force=[0, 0, 5.0], torque=[0, 0, 0.01], seconds=0.1)
+    pull, twist = env.roots.wrench(env.data, root)
+    assert pull > 0 and twist > 0
+    assert env.roots.load(env.data, root) == pytest.approx(pull / break_force + twist / 0.05)
+
+
+def test_a_reset_without_options_restores_the_defaults(env):
+    env.reset(options={"break_force": 20.0, "break_torque": 0.1})
+    env.reset()
+    assert env.roots.break_force == ROOT_BREAK_FORCE == 15.0
+    assert env.roots.break_torque == ROOT_BREAK_TORQUE == 0.07
+
+
+def test_a_stronger_root_holds_a_pull_the_nominal_one_gives_way_to(env):
+    """Root strength scales one weed's capacity, in pull and twist alike."""
+    axis = env.roots.up[env.roots.of_body[env.model.body(WEED).id]]
+    pull = 1.2 * ROOT_BREAK_FORCE * axis
+    _, nominal = hold(env, WEED, force=pull, seconds=1.0)
+    assert nominal
+    env.reset(options={"root_strength": {WEED: 20 / 15}})
+    _, strong = hold(env, WEED, force=pull, seconds=1.0)
+    assert not strong
+    env.reset(options={"root_strength": {WEED: 20 / 15}})
+    _, stronger_pull = hold(env, WEED, force=1.5 * ROOT_BREAK_FORCE * axis, seconds=1.0)
+    assert stronger_pull
+
+
+def test_root_strength_applies_to_the_named_weed_only(env):
+    env.reset(options={"root_strength": {WEED: 1.25}})
+    root = env.roots.of_body[env.model.body(WEED).id]
+    assert env.roots.strength[root] == 1.25
+    assert all(s == 1.0 for eq, s in env.roots.strength.items() if eq != root)
+    hold(env, WEED, force=[0, 0, 5.0], torque=[0, 0, 0.01], seconds=0.1)
+    pull, twist = env.roots.wrench(env.data, root)
+    assert env.roots.load(env.data, root) == pytest.approx(
+        (pull / ROOT_BREAK_FORCE + twist / ROOT_BREAK_TORQUE) / 1.25)
+    env.reset()
+    assert set(env.roots.strength.values()) == {1.0}
+
+
+def test_root_strength_for_a_weed_that_is_not_there_is_refused(env):
+    with pytest.raises(ValueError, match="dandelion_1"):
+        env.reset(options={"root_strength": {"dandelion_1": 1.2}})
