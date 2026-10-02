@@ -19,7 +19,7 @@ def home_data(model):
 def test_compiles(model):
     assert model.nu == 9
     cameras = [model.camera(i).name for i in range(model.ncam)]
-    assert cameras == ["rgb_camera", "d435i_color", "d435i_depth"]
+    assert cameras == ["rgb_camera", "bed_camera", "d435i_color", "d435i_depth"]
 
 
 def test_base_reaches_target(model):

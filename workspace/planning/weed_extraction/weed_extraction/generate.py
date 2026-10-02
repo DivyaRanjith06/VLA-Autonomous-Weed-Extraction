@@ -23,6 +23,7 @@ import argparse
 import dataclasses
 import json
 import os
+import resource
 import shutil
 import subprocess
 import sys
@@ -39,11 +40,12 @@ from weed_extraction.validate import validate_episode
 
 
 def plan_jobs(seed, families, variants, per_scene):
-    """`per_scene` single-target prompts, each on a different weed, in every catalogue
-    scene of `families` x `variants`.
+    """`per_scene` typed prompts in every catalogue scene of `families` x `variants`.
 
-    Each pick goes to the prompt kind used least so far across the whole plan, so the
-    kinds most scenes offer do not crowd out the rarer ones; `seed` only breaks ties.
+    A scene offers up to six: each weed type alone and in each bed. The types alone come
+    first, so a scene holding both gives a contrast pair, then the prompts that reach a
+    weed no earlier one does; `seed` only breaks ties. Each kind takes the wording used
+    least so far across the whole plan.
     """
     catalogue = Manifest.catalogue(max(variants) + 1)
     jobs, used = [], {}
@@ -51,40 +53,47 @@ def plan_jobs(seed, families, variants, per_scene):
         family_index = list(Manifest.FAMILIES).index(family)
         for variant in variants:
             manifest = catalogue[family][variant]
-            singles = [p for p in Prompt.valid(manifest) if len(p.targets) == 1]
+            wordings = {}  # (kind, target) -> that prompt in each wording
+            for p in Prompt.typed(manifest):
+                wordings.setdefault((p.kind, p.targets[0]), []).append(p)
             rng = np.random.default_rng([seed, family_index, variant])
-            shuffled = [singles[i] for i in rng.permutation(len(singles))]
+            free = [list(wordings)[i] for i in rng.permutation(len(wordings))]
             chosen = []
-            while len(chosen) < per_scene:
-                free = [p for p in shuffled if p.targets[0] not in {c.targets[0] for c in chosen}]
-                if not free:
-                    break
-                pick = min(free, key=lambda p: used.get(p.kind, 0))  # first of the least used
-                chosen.append(pick)
-                used[pick.kind] = used.get(pick.kind, 0) + 1
-            jobs += [{"id": f"{family}_{variant}_{k}", "family": family, "variant": variant,
-                      "scene_seed": manifest.seed, "split": manifest.split,
-                      "prompt": p.text, "prompt_kind": p.kind, "target": p.targets[0]}
-                     for k, p in enumerate(chosen)]
+            while free and len(chosen) < per_scene:
+                taken = {target for _, target in chosen}
+                chosen.append(min(free, key=lambda k: (k[0] != "type", k[1] in taken)))
+                free.remove(chosen[-1])
+            wording = {}  # one per kind in a scene, so a contrast pair differs only in type
+            for kind in sorted({kind for kind, _ in chosen}):
+                wording[kind] = min(range(len(Prompt.WORDINGS[kind])),
+                                    key=lambda i: used.get((kind, i), 0))
+                used[kind, wording[kind]] = used.get((kind, wording[kind]), 0) + 1
+            for k, key in enumerate(chosen):
+                p = wordings[key][wording[key[0]]]
+                jobs.append({"id": f"{family}_{variant}_{k}", "family": family,
+                             "variant": variant, "scene_seed": manifest.seed,
+                             "split": manifest.split, "prompt": p.text, "prompt_kind": p.kind,
+                             "target": p.targets[0]})
     return jobs
 
 
-def plan_dataset(seed, train_per_scene, held_out_per_scene):
-    """Jobs for every catalogue scene: `train_per_scene` episodes in each training scene,
-    `held_out_per_scene` in each held-out one. Each split is balanced on its own."""
-    variants = range(Manifest.HELD_OUT_VARIANT + 1)
+def plan_dataset(seed, per_scene, layouts):
+    """`per_scene` episodes in each of the first `layouts` training scenes of every
+    training family. The held-out family and variant are left for evaluation."""
     known = [f for f in Manifest.FAMILIES if f != Manifest.HELD_OUT_FAMILY]
-    train = [v for v in variants if v != Manifest.HELD_OUT_VARIANT]
-    return (plan_jobs(seed, known, train, train_per_scene)
-            + plan_jobs(seed, [Manifest.HELD_OUT_FAMILY], list(variants), held_out_per_scene)
-            + plan_jobs(seed, known, [Manifest.HELD_OUT_VARIANT], held_out_per_scene))
+    variants = [v for v in range(layouts + 1) if v != Manifest.HELD_OUT_VARIANT][:layouts]
+    return plan_jobs(seed, known, variants, per_scene)
 
 
 def default_workers(per_worker_gb):
-    """As many workers as the free memory holds at `per_worker_gb` each, leaving a core."""
-    with open("/proc/meminfo") as meminfo:
-        free_kb = next(int(line.split()[1]) for line in meminfo
-                       if line.startswith("MemAvailable"))
+    """As many workers as the free memory holds at `per_worker_gb` each, leaving a core.
+    Off Linux the free memory is not readable, so half of what is installed counts."""
+    if Path("/proc/meminfo").exists():
+        with open("/proc/meminfo") as meminfo:
+            free_kb = next(int(line.split()[1]) for line in meminfo
+                           if line.startswith("MemAvailable"))
+    else:
+        free_kb = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2 / 1024
     return max(1, min(os.cpu_count() - 1, int(free_kb / 2**20 // per_worker_gb)))
 
 
@@ -200,7 +209,7 @@ def run_worker(batch_dir, job_id):
     out = batch_dir / "episodes" / job_id
     began = time.time()
     manifest = Manifest.variants(job["family"], job["variant"] + 1)[job["variant"]]
-    prompt = next(p for p in Prompt.valid(manifest)
+    prompt = next(p for p in (*Prompt.typed(manifest), *Prompt.valid(manifest))
                   if p.text == job["prompt"] and p.targets == (job["target"],))
     env = build_env(manifest, out / "scene", cameras=cameras, width=settings["width"],
                     height=settings["height"], control_hz=settings["control_hz"],
@@ -241,7 +250,10 @@ def _collect(out, job, plan, returncode, timed_out):
 
 def _peak_rss_mb():
     """This process's own peak resident memory. Not getrusage's ru_maxrss: Linux carries
-    that across fork and exec, so a worker would report its parent's peak."""
+    that across fork and exec, so a worker would report its parent's peak. macOS has
+    nothing else, and there it counts bytes."""
+    if not Path("/proc/self/status").exists():
+        return round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20)
     with open("/proc/self/status") as status:
         return round(next(int(line.split()[1]) for line in status
                           if line.startswith("VmHWM")) / 1024)
@@ -257,11 +269,11 @@ def main():
     run.add_argument("--variants", nargs="+", type=int, default=[0])
     run.add_argument("--per-scene", type=int, default=1, help="episodes per scene")
     run.add_argument("--cameras", nargs="*",
-                     default=["d435i_color", "d435i_depth", "rgb_camera"])
-    run.add_argument("--width", type=int, default=256)
-    run.add_argument("--height", type=int, default=144)
+                     default=["d435i_color", "d435i_depth", "rgb_camera", "bed_camera"])
+    run.add_argument("--width", type=int, default=384)
+    run.add_argument("--height", type=int, default=384)
     # One worker: the environment and IK take about 2 GB, and a worst-case three-attempt
-    # episode holds 2850 frames of three cameras besides.
+    # episode holds 1428 frames of four cameras besides.
     run.add_argument("--worker-gb", type=float, default=4.0, help="memory per worker")
     run.add_argument("--workers", type=int, help="default: as many as memory allows")
     run.add_argument("--timeout", type=float, default=1800, help="seconds per episode")
@@ -275,9 +287,10 @@ def main():
         return
     plan = {"seed": args.seed,
             "settings": {"cameras": args.cameras, "width": args.width, "height": args.height,
-                         # 50 Hz is the rate the expert is verified at; 3000 steps cover a
-                         # three-attempt episode (at most 2850 frames).
-                         "control_hz": 50, "max_steps": 3000},
+                         # 25 Hz is near the 30 fps SmolVLA was trained on, and the
+                         # expert works at it; 1500 steps cover a three-attempt episode
+                         # (at most 1428 frames).
+                         "control_hz": 25, "max_steps": 1500},
             "jobs": plan_jobs(args.seed, args.families, args.variants, args.per_scene)}
     workers = args.workers or default_workers(args.worker_gb)
     print(f"{len(plan['jobs'])} episodes, {workers} workers -> {args.batch_dir}", flush=True)

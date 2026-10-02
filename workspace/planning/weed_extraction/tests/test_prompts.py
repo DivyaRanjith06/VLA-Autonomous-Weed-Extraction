@@ -95,3 +95,13 @@ def test_every_catalogued_scene_answers_every_required_prompt():
 def test_prompts_that_ask_for_every_target_say_so(text):
     prompt = next(p for p in Prompt.valid(scene(("shepherd", 0.0, 0.5))) if p.text == text)
     assert prompt.every
+
+
+def test_a_typed_prompt_means_the_nearest_weed_of_its_type():
+    m = scene(("shepherd", 1.0, 0.5), ("shepherd", -1.0, -0.5), ("sowthistle", 0.0, 0.5))
+    typed = {p.text: p.targets for p in Prompt.typed(m)}
+    assert typed["remove the shepherd weed"] == ("shepherd_2",)
+    assert typed["pull out the shepherd weed in the left bed"] == ("shepherd_1",)
+    assert typed["get rid of the sowthistle weed"] == ("sowthistle_1",)
+    assert not any("sowthistle" in text and "right" in text for text in typed)
+    assert len(typed) == 4 * 5  # every wording of the five prompts the scene offers

@@ -44,7 +44,8 @@ class Layout:
 
     CAMERAS = {"d435i_color": "observation.images.wrist",
                "d435i_depth": "observation.images.wrist_depth",
-               "rgb_camera": "observation.images.overview"}
+               "rgb_camera": "observation.images.overview",
+               "bed_camera": "observation.images.bed"}
     # The robot's joints, in the order the state lists them.
     JOINTS = ("base_slide_x", *(f"joint{i}" for i in range(1, 8)), "finger_joint1",
               "finger_joint2")

@@ -18,28 +18,26 @@ CAMERAS = ["d435i_color", "d435i_depth", "rgb_camera"]
 
 # Planning
 
-def test_the_dataset_plan_covers_every_scene_by_its_split():
-    jobs = plan_dataset(0, 4, 1)
-    catalogue = Manifest.catalogue(5)
+def test_the_dataset_plan_covers_only_the_training_scenes():
+    jobs = plan_dataset(0, 4, 8)
     per_scene = collections.Counter((j["family"], j["variant"]) for j in jobs)
-    for family, variants in catalogue.items():
-        for m in variants:
-            assert per_scene[(family, m.variant)] == (4 if m.split == "train" else 1)
-    assert all(j["split"] == catalogue[j["family"]][j["variant"]].split for j in jobs)
-    assert not any(j["family"] == Manifest.HELD_OUT_FAMILY for j in jobs if j["split"] == "train")
+    assert len(per_scene) == 8 * (len(Manifest.FAMILIES) - 1)
+    assert all(3 <= count <= 4 for count in per_scene.values())
+    assert {j["split"] for j in jobs} == {"train"}
+    assert Manifest.HELD_OUT_VARIANT not in {j["variant"] for j in jobs}
 
 
-def test_prompts_are_spread_over_every_kind_the_scenes_offer():
-    """Least used first: a kind only a few scenes offer is taken where it is offered."""
-    train = [j for j in plan_dataset(0, 4, 1) if j["split"] == "train"]
-    kinds = collections.Counter(j["prompt_kind"] for j in train)
-    assert set(kinds) >= {"instance", "nearest", "crop_safe", "species_region", "species_area",
-                          "species_front", "species_one", "species_all", "side_one"}
-    assert kinds["instance"] < 0.5 * len(train)
+def test_wordings_are_spread_evenly():
+    """Least used first, one wording per kind in a scene."""
+    jobs = plan_dataset(0, 4, 8)
+    texts = collections.Counter(
+        j["prompt"].replace("shepherd", "sowthistle").replace("right", "left") for j in jobs)
+    assert len(texts) == 8
+    assert max(texts.values()) - min(texts.values()) <= 4
 
 
 def test_the_same_seed_plans_the_same_dataset():
-    assert plan_dataset(0, 4, 1) == plan_dataset(0, 4, 1)
+    assert plan_dataset(0, 4, 8) == plan_dataset(0, 4, 8)
 
 
 # Building

@@ -149,6 +149,10 @@
       <inertial mass="30" pos="0 0 -0.05" diaginertia="1 1 1"/>
       <geom name="base_cart" type="box" size="0.18 0.18 0.05" pos="0 0 -0.06" contype="0" conaffinity="0" group="2" rgba="0.2 0.2 0.25 1"/>
 
+      <!-- Bed camera: 1.6 m up, riding with the base and tilted 55 degrees down, so it
+           shows both beds for about 1.5 m ahead of the robot. -->
+      <camera name="bed_camera" pos="-0.14 0 1.61" xyaxes="0 -1 0 0.819 0 0.574" fovy="45"/>
+
       <!-- Weed bin, carried behind the cart so it follows the base down the row and
            stays outside the arm's working side. MuJoCo would collide a mesh by its
            convex hull, which is a lid over the opening, so the walls are boxes. -->

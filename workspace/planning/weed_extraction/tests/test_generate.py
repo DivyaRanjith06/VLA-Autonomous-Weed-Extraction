@@ -39,7 +39,7 @@ def test_the_same_seed_plans_the_same_batch():
     assert plan_jobs(3, ["low_light"], [0, 1], 2) != plan_jobs(4, ["low_light"], [0, 1], 2)
 
 
-def test_every_planned_prompt_is_a_valid_single_target_prompt_of_its_scene():
+def test_every_planned_prompt_is_a_typed_prompt_of_its_scene():
     jobs = plan_jobs(0, list(Manifest.FAMILIES), [0, 1], 2)
     assert len({j["id"] for j in jobs}) == len(jobs)
     catalogue = Manifest.catalogue(2)
@@ -47,12 +47,17 @@ def test_every_planned_prompt_is_a_valid_single_target_prompt_of_its_scene():
         manifest = catalogue[job["family"]][job["variant"]]
         assert (job["scene_seed"], job["split"]) == (manifest.seed, manifest.split)
         assert any(p.text == job["prompt"] and p.targets == (job["target"],)
-                   for p in Prompt.valid(manifest))
-    for family in Manifest.FAMILIES:  # two episodes per scene, on two different weeds
+                   for p in Prompt.typed(manifest))
+    for family in Manifest.FAMILIES:  # two episodes per scene, in one wording
         for variant in (0, 1):
-            targets = [j["target"] for j in jobs
-                       if (j["family"], j["variant"]) == (family, variant)]
-            assert len(targets) == len(set(targets)) == 2
+            scene = [j for j in jobs if (j["family"], j["variant"]) == (family, variant)]
+            assert len(scene) == 2
+            species = {p.species for p in catalogue[family][variant].weeds}
+            if len(species) == 2:  # the contrast pair: the prompts differ only in the type
+                first, second = (j["prompt"] for j in scene)
+                assert {j["prompt_kind"] for j in scene} == {"type"}
+                assert first.replace("shepherd", "sowthistle") == \
+                    second.replace("shepherd", "sowthistle") and first != second
 
 
 def test_workers_fit_the_free_memory():

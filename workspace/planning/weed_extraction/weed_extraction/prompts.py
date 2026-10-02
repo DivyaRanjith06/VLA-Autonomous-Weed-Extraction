@@ -4,6 +4,9 @@ A prompt is valid in a scene only when what it names is there and cannot be read
 ways: "the shepherd weed" needs exactly one shepherd, and "weed 3" needs weeds that
 cannot be counted in two orders. Weeds are counted along the rail from the base's home
 position. Left and right are the robot's, facing along the rail: left is +y.
+
+The typed prompts are the exception. They name a weed type, which several weeds may
+share, and mean the nearest of them.
 """
 
 import dataclasses
@@ -23,6 +26,36 @@ class Prompt:
     # wanted too.
     REQUIRED = ("all_weeds", "species_all", "instance", "nearest", "left_bed", "right_bed",
                 "crop_safe")
+    # The ways to say each typed prompt.
+    WORDINGS = {
+        "type": ("remove the {species} weed", "pull out the {species} weed",
+                 "take the {species} weed out of the bed", "get rid of the {species} weed"),
+        "type_side": ("remove the {species} weed from the {side} bed",
+                      "pull out the {species} weed in the {side} bed",
+                      "take the {species} weed out of the {side} bed",
+                      "get rid of the {species} weed in the {side} bed"),
+    }
+
+    @classmethod
+    def typed(cls, manifest):
+        """The prompts that name a weed type, alone or with a bed, in every wording.
+
+        Several weeds may match one. Its target is the match nearest the base's home
+        position, the first the base reaches, so the same scene and prompt always lead
+        to the same weed.
+        """
+        found = []
+        weeds = sorted(manifest.weeds, key=lambda p: abs(p.x - cls.START))
+        for species in sorted({p.species for p in weeds}):
+            of = [p for p in weeds if p.species == species]
+            places = {None: of, "left": [p for p in of if p.y > 0],
+                      "right": [p for p in of if p.y < 0]}
+            for side, there in places.items():
+                kind = "type_side" if side else "type"
+                found += [cls(kind, text.format(species=species, side=side),
+                              (there[0].name,), False)
+                          for text in cls.WORDINGS[kind] if there]
+        return tuple(found)
 
     @classmethod
     def valid(cls, manifest):

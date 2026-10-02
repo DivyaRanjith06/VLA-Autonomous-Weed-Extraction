@@ -150,7 +150,8 @@ def _metadata(episode, manifest, streams):
               and np.isclose(episode["root_break_torque_nm"], ROOT_BREAK_TORQUE * weed.root)):
         wrong.append("root thresholds differ from the manifest's root strength")
     if not any(p.text == episode["prompt"] and p.kind == episode["prompt_kind"]
-               and p.targets == (episode["target"],) for p in Prompt.valid(manifest)):
+               and p.targets == (episode["target"],)
+               for p in (*Prompt.valid(manifest), *Prompt.typed(manifest))):
         wrong.append(f"{episode['prompt']!r} does not name {episode['target']} in this scene")
     if (episode["uprooted_step"] is not None) != bool(streams["uprooted_this_step"].any()):
         wrong.append("the recorded success disagrees with the uprooted stream")

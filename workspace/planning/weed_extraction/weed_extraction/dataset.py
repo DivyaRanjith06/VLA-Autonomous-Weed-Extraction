@@ -1,6 +1,6 @@
 """Build the training dataset in chunks that fit the disk: generate, pack, check, prune.
 
-    python -m weed_extraction.dataset <out_dir> [--train-per-scene 4 --held-out-per-scene 1]
+    python -m weed_extraction.dataset <out_dir> [--per-scene 4 --layouts 8]
 
 A raw episode is about 180 MB, so the whole batch does not fit on disk at once. The plan
 is split into chunks, and each chunk goes through the usual pipeline -- generated and
@@ -36,7 +36,7 @@ from lerobot.datasets.compute_stats import aggregate_stats  # noqa: E402
 def build(out_dir, plan, chunk_size, workers, timeout_s):
     """Generate, pack, check and prune `plan` chunk by chunk under `out_dir`, then merge
     and check one dataset per split in `out_dir/lerobot`. Returns the report."""
-    out_dir = Path(out_dir)
+    out_dir = Path(out_dir).resolve()  # the scene files need absolute texture paths
     out_dir.mkdir(parents=True, exist_ok=True)
     plan_file = out_dir / "plan.json"
     if plan_file.exists() and json.loads(plan_file.read_text()) != {**plan, "chunk_size": chunk_size}:
@@ -195,24 +195,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("out_dir", type=Path)
     parser.add_argument("--seed", type=int, default=0, help="draws the prompts")
-    parser.add_argument("--train-per-scene", type=int, default=4)
-    parser.add_argument("--held-out-per-scene", type=int, default=1)
+    parser.add_argument("--per-scene", type=int, default=4, help="episodes per scene")
+    parser.add_argument("--layouts", type=int, default=8, help="scenes per training family")
     # Fifteen raw episodes are about 2.7 GB.
     parser.add_argument("--chunk-size", type=int, default=15)
     parser.add_argument("--cameras", nargs="*",
-                        default=["d435i_color", "d435i_depth", "rgb_camera"])
-    parser.add_argument("--width", type=int, default=256)
-    parser.add_argument("--height", type=int, default=144)
+                        default=["d435i_color", "d435i_depth", "rgb_camera", "bed_camera"])
+    parser.add_argument("--width", type=int, default=384)
+    parser.add_argument("--height", type=int, default=384)
     parser.add_argument("--worker-gb", type=float, default=4.0, help="memory per worker")
     parser.add_argument("--workers", type=int, help="default: as many as memory allows")
     parser.add_argument("--timeout", type=float, default=1800, help="seconds per episode")
     args = parser.parse_args()
     plan = {"seed": args.seed,
             "settings": {"cameras": args.cameras, "width": args.width, "height": args.height,
-                         # 50 Hz is the rate the expert is verified at; 3000 steps cover a
-                         # three-attempt episode (at most 2850 frames).
-                         "control_hz": 50, "max_steps": 3000},
-            "jobs": plan_dataset(args.seed, args.train_per_scene, args.held_out_per_scene)}
+                         # 25 Hz is near the 30 fps SmolVLA was trained on, and the
+                         # expert works at it; 1500 steps cover a three-attempt episode
+                         # (at most 1428 frames).
+                         "control_hz": 25, "max_steps": 1500},
+            "jobs": plan_dataset(args.seed, args.per_scene, args.layouts)}
     workers = args.workers or default_workers(args.worker_gb)
     print(f"{len(plan['jobs'])} episodes in chunks of {args.chunk_size}, {workers} workers "
           f"-> {args.out_dir}", flush=True)
