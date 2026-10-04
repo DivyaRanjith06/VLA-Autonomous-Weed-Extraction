@@ -150,6 +150,7 @@ VLA-Weed-Extraction/
 │   ├── train.sh              fine-tune SmolVLA on dataset v2 (bed and wrist cameras, vision frozen)
 │   └── demo.sh               type a prompt: scan the bed, park at a matching weed, pick it
 ├── docker_scripts/run_scripts/   build (passes --build-arg), base, devel, up, enter_bash, stop
+├── models/                   Git LFS: detector.pt (the demo's weed detector), smolvla_weeds/ (the baseline SmolVLA, 20,000 steps)
 ├── outputs/                  generated scenes and datasets; git-ignored
 └── workspace/
     ├── hardware/

@@ -209,7 +209,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("prompt", help='e.g. "remove the shepherd weed"; after it, the '
                                        "demo asks for the next")
-    parser.add_argument("--detector", type=Path, default=Path("outputs/detector/detector.pt"))
+    parser.add_argument("--detector", type=Path, default=Path("models/detector.pt"))
     parser.add_argument("--family", default="midday_dry", choices=list(Manifest.FAMILIES))
     parser.add_argument("--variant", type=int, default=0,
                         help=f"scene of the family; {Manifest.HELD_OUT_VARIANT} was not "

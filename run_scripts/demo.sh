@@ -7,7 +7,7 @@
 set -e
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-detector=outputs/detector/detector.pt
+detector=models/detector.pt
 
 if [[ ! -f "$detector" ]]; then
 	.venv/bin/python -m weed_extraction.detector render outputs/detector/data
