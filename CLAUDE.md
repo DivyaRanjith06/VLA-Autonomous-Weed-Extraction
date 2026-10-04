@@ -146,7 +146,9 @@ VLA-Weed-Extraction/
 ├── run_scripts/
 │   ├── setup.sh              native venv setup; --smolvla adds LeRobot and the smolvla extra
 │   ├── simulate.sh           launcher; works natively and inside the container
-│   └── test_up_root.sh       scripted grasp-twist-pull demo in the viewer
+│   ├── test_up_root.sh       scripted grasp-twist-pull demo in the viewer
+│   ├── train.sh              fine-tune SmolVLA on dataset v2 (bed and wrist cameras, vision frozen)
+│   └── demo.sh               type a prompt: scan the bed, park at a matching weed, pick it
 ├── docker_scripts/run_scripts/   build (passes --build-arg), base, devel, up, enter_bash, stop
 ├── outputs/                  generated scenes and datasets; git-ignored
 └── workspace/
@@ -180,9 +182,11 @@ VLA-Weed-Extraction/
             │   ├── generate.py       planning and process-isolated parallel generation
             │   ├── pack.py           LeRobot Dataset v3 packing and inspection
             │   ├── dataset.py        chunked build: generate, pack, check, prune, merge
-            │   └── policy.py         SmolVLA input boundary: depth step, features, model directory
+            │   ├── policy.py         SmolVLA input boundary: depth step, features, model directory
+            │   ├── detector.py       weed detector on the bed camera: render labelled pictures, train, place plants
+            │   └── demo.py           state machine: back up, scan, go, pick (the scripted expert), return home; asks for the next prompt
             ├── configs/{view,capture,uproot}.yaml
-            └── tests/                13 files: test_scene (the MJCF), test_manifest (scene.py), one per other module but launch.py
+            └── tests/                14 files: test_scene (the MJCF), test_manifest (scene.py), one per other module but launch.py and demo.py
 ```
 
 ### Active scene: `workspace/application/field_description/scene_mobile_field.xml`
@@ -199,7 +203,7 @@ Cameras (3): `rgb_camera` — worldbody, `mode="track" target="link0"`, third-pe
 
 1. **Plan**: 4 episodes in each of the 20 training scenes and 1 in each of the 10 held-out scenes, 90 in all. Each episode is one single-target prompt, balanced over the prompt kinds each scene offers.
 2. **Generate**: one worker process per episode. The recorder reads the state before each action, then the expert (with recovery) acts. Validation then accepts or rejects the episode with a reason.
-3. **Pack**: each chunk is packed to LeRobot v3 and inspected against its raw frames. The accepted raw frames are then deleted; they can be regenerated deterministically.
+3. **Pack**: each chunk is packed to LeRobot v3 and inspected against its raw frames. The raw frames, accepted and rejected, are then deleted; they can be regenerated deterministically.
 4. **Merge**: one dataset per split, checked against its chunks.
 
 Splits: `held_out_family` is all of evening_cool. `held_out_variant` is variant 4 of the other five families. `train` is everything else.
@@ -216,16 +220,28 @@ The depth is stored in metres. `policy.DepthToRGBProcessorStep` heads SmolVLA's 
 
 `label.*` (root wrench, phase, attempt, held, uprooted) is never a policy input.
 
-`python -m weed_extraction.policy` writes the `lerobot/smolvla_base` model directory. Train with `lerobot_train.py --policy.path=<dir> --env.discover_packages_path=weed_extraction`.
+`python -m weed_extraction.policy` writes the `lerobot/smolvla_base` model directory; `--cameras bed wrist` limits the policy to those images, and the depth step is then left out. `run_scripts/train.sh` does both steps for dataset v2. By hand, train with `lerobot_train.py --policy.path=<dir> --env.discover_packages_path=weed_extraction`.
+
+### Running the demo
+
+`run_scripts/demo.sh "remove the shepherd weed"` runs a state machine in `demo.py`, with no trained policy. The base backs to the start of the rail, drives along the bed at 0.3 m/s while the weed detector maps the bed camera's view, and parks at the first matching weed. The scripted expert (`Uprooter`, as in `test_up_root.sh`) then picks the weed nearest the detector's placement and drops it in the bin. If the weed is not in the bin, the arm returns to the home pose and the expert tries again, up to 3 picks. After returning home the demo asks for the next prompt in the same scene; Enter quits. Roots are at half strength in the demo only.
+
+The trained models were dropped from the demo: the baseline and the pick-only model (`outputs/train/smolvla_pick`, 10,000 steps at batch 16) both closed the jaws 2 to 3 cm from the stem.
+
+The weed detector (`detector.py`) is a torchvision Faster R-CNN over three labels: sowthistle, shepherd, strawberry. `render` saves bed camera pictures from stops along the rail of 54 catalogue scenes, boxed by the simulator's segmentation render. `train` fits the 40 training scenes and checks the 14 held-out ones. A box is placed on the bed where its ray meets a plane at a height measured per label.
 
 ## 6. Maintenance Protocol
 
 After every completed implementation step, update this file: structure, pipeline, and the state below. Remove claims that stopped being true rather than appending corrections.
 
-**State (2026-09-25):**
-- 230 tests pass, about 20 minutes. Tests needing the `smolvla` extra skip without it.
+**State (2026-10-03):**
+- 230 tests passed on 2026-09-25, about 20 minutes; since then only `test_detector.py` (2 tests) and the planning tests of `test_generate.py` were run. Tests needing the `smolvla` extra skip without it.
 - Pinned: MuJoCo 3.13.0, mink 1.3.0; the `smolvla` extra pins torch 2.11.0, transformers 5.5.4 and datasets 4.8.5.
-- The pre-training dataset is built and verified. SmolVLA training has not been run beyond a few smoke-test steps.
+- The baseline (dataset v2, 20,000 steps at batch 5, `outputs/train/smolvla_weeds`) does not reach a weed: it guesses where to drive, because most recorded weeds start out of the bed camera's view. `docs/adr/0002` splits the task instead.
+- Weed detector on the 14 held-out scenes: 382 of 383 sowthistles and 322 of 347 shepherd weeds found, no wrong types, median 5 to 6 mm off along the bed.
+- The demo with the baseline as pick model: parked at a weed in 8 of 8 runs, binned it in 1.
+- `python -m weed_extraction.dataset <dir> --parked` records pick-only episodes: the base is parked beside the weed before recording, and every prompt names type and bed. `run_scripts/train.sh` trains on `outputs/dataset_pick`, which was being built on 2026-10-03 (137 episodes planned); the pick model is not trained yet.
+- On the RTX 4060 Laptop (8 GB): vision frozen fits at batch 16 (4.9 GB, about 1.3 s a step). Training the vision and language parts together runs out of memory at batch 4 and 8; training only part of them is untested. torchcodec cannot load there, so `test_lerobot_train_consumes_the_model_directory` fails and training reads videos with pyav.
 
 **Known deviations from the plan:**
 - 50 Hz recording, not 20 fps.

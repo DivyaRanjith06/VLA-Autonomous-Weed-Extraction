@@ -1,2 +1,1 @@
-weed_extraction_dataset_v1.tar.gz filter=lfs diff=lfs merge=lfs -text
 weed_extraction_dataset_v2.tar.gz filter=lfs diff=lfs merge=lfs -text

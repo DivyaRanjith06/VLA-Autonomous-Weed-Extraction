@@ -126,13 +126,58 @@ Agreed on 2026-10-02; the reasons are in `docs/adr/0001-dataset-v2-design.md`.
 - Built on the NVIDIA Linux machine. It replaces version 1, which is removed from the
   repository once version 2 is verified.
 
-## Open questions
+## Decisions for the baseline training run
 
-- Which NVIDIA card and how much memory? It decides the batch size and whether the
-  unfrozen run in step 8 fits.
-- A fixed camera over the whole bed, or one mounted high on the robot looking ahead? The
-  second is closer to what a real robot could carry.
-- Is rebuilding the dataset acceptable, given the current one was just uploaded?
+Agreed on 2026-10-02.
+
+- Trained on the RTX 4060 Laptop (8 GB), on dataset version 2 (140 episodes, 25 pictures
+  a second).
+- The model sees the bed camera and the wrist camera, colour only. The overview camera
+  and the depth image stay in the dataset but are not given to the model.
+- Vision frozen. The memory test showed that training the vision and language parts
+  together does not fit in 8 GB at batch 4 or 8. Training only part of them is untested.
+- 20,000 steps at batch 16, saved every 5,000, started with `run_scripts/train.sh`. About
+  7 hours.
+- A live demo comes before the scored tester: type a prompt, watch the model drive the
+  robot in the viewer, and read whether a matching weed ended in the bin. It opens a
+  seen scene by default.
+- If the baseline picks the wrong weed type, the fix is chosen from how it fails.
+
+## Result of the baseline, and the split design
+
+Written 2026-10-03. The reasons are in `docs/adr/0002-state-machine-around-the-pick-model.md`.
+
+The baseline (20,000 steps at batch 5) did not reach a weed. Fed recorded frames from the
+middle of an episode it predicts the right arm motion, but at the first frame it must
+decide where to drive, and its guess was off by more than 0.3 m in 11 of 14 training
+episodes. The cause is the data: in 81 of 140 examples the weed starts more than 1.5 m
+away, outside the bed camera's view.
+
+So the task is split:
+
+1. **Back up**: the base drives to the start of the rail.
+2. **Scan**: it drives along the bed at 0.3 m a second. The weed detector builds the weed
+   map from the bed camera.
+3. **Go**: at the first matching weed within 0.6 m ahead, it parks beside it.
+4. **Pick**: the pick model moves the arm. It is told the weed type and the bed.
+
+Decided with the user: a trained detector (not the simulator's knowledge), covering the
+crop as well; stop at the first matching weed; the demo counts a grasp within 1 cm of the
+stem.
+
+Measured so far:
+
+- Weed detector, on the 14 held-out scenes: 382 of 383 sowthistles and 322 of 347
+  shepherd weeds found, none given the wrong type, placed within 5 to 6 mm along the bed
+  (median).
+- Scan and park, with the baseline as the pick model, 8 prompts over 4 scenes: the base
+  parked at a weed every time; 2 weeds uprooted, 1 binned. The baseline was trained on
+  driving and reaching mixed together, and often skips ahead in the motion.
+
+Next: a pick-only dataset, `python -m weed_extraction.dataset outputs/dataset_pick
+--parked`. 137 episodes in the 38 training layouts; the base is parked beside the weed
+before recording starts, and every prompt names the weed type and the bed. Then
+`run_scripts/train.sh` trains the pick model on it, and `run_scripts/demo.sh` runs it.
 
 ## Sources
 

@@ -31,6 +31,7 @@ import time
 import zipfile
 from pathlib import Path
 
+import mujoco
 import numpy as np
 
 from weed_extraction.prompts import Prompt
@@ -39,8 +40,9 @@ from weed_extraction.scene import Manifest, build_env
 from weed_extraction.validate import validate_episode
 
 
-def plan_jobs(seed, families, variants, per_scene):
-    """`per_scene` typed prompts in every catalogue scene of `families` x `variants`.
+def plan_jobs(seed, families, variants, per_scene, kinds=("type", "type_side")):
+    """`per_scene` typed prompts, of `kinds`, in every catalogue scene of `families` x
+    `variants`.
 
     A scene offers up to six: each weed type alone and in each bed. The types alone come
     first, so a scene holding both gives a contrast pair, then the prompts that reach a
@@ -54,7 +56,7 @@ def plan_jobs(seed, families, variants, per_scene):
         for variant in variants:
             manifest = catalogue[family][variant]
             wordings = {}  # (kind, target) -> that prompt in each wording
-            for p in Prompt.typed(manifest):
+            for p in (p for p in Prompt.typed(manifest) if p.kind in kinds):
                 wordings.setdefault((p.kind, p.targets[0]), []).append(p)
             rng = np.random.default_rng([seed, family_index, variant])
             free = [list(wordings)[i] for i in rng.permutation(len(wordings))]
@@ -77,12 +79,12 @@ def plan_jobs(seed, families, variants, per_scene):
     return jobs
 
 
-def plan_dataset(seed, per_scene, layouts):
+def plan_dataset(seed, per_scene, layouts, kinds=("type", "type_side")):
     """`per_scene` episodes in each of the first `layouts` training scenes of every
     training family. The held-out family and variant are left for evaluation."""
     known = [f for f in Manifest.FAMILIES if f != Manifest.HELD_OUT_FAMILY]
     variants = [v for v in range(layouts + 1) if v != Manifest.HELD_OUT_VARIANT][:layouts]
-    return plan_jobs(seed, known, variants, per_scene)
+    return plan_jobs(seed, known, variants, per_scene, kinds)
 
 
 def default_workers(per_worker_gb):
@@ -215,6 +217,8 @@ def run_worker(batch_dir, job_id):
                     height=settings["height"], control_hz=settings["control_hz"],
                     max_steps=settings["max_steps"])
     env.reset()
+    if settings.get("parked"):
+        park(env, job["target"])
     record_episode(env, manifest, prompt, out / "episode")
     env.close()
     validate_episode(out / "episode", cameras=cameras)
@@ -222,6 +226,18 @@ def run_worker(batch_dir, job_id):
     marker.write_text(json.dumps({"job": job_id, "runtime_s": round(time.time() - began, 1),
                                   "peak_rss_mb": _peak_rss_mb()}))
     os.replace(marker, out / "worker.json")
+
+
+def park(env, weed):
+    """Drive the base beside `weed` and let it settle, arm at home, before anything is
+    recorded: a pick-only episode starts where the scan leaves the robot."""
+    model, data = env.model, env.data
+    joint = model.joint("base_slide_x")
+    target = data.xpos[model.body(weed).id][0]
+    data.ctrl[model.actuator("base_x").id] = target
+    while (abs(data.qpos[joint.qposadr[0]] - target) > 0.002
+           or abs(data.qvel[joint.dofadr[0]]) > 0.005):
+        mujoco.mj_step(model, data, nstep=env.n_substeps)
 
 
 def _collect(out, job, plan, returncode, timed_out):

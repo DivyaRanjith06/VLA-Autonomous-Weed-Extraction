@@ -155,7 +155,9 @@ def inspect(batch_dir, root):
     sidecar = [json.loads(line) for line in
                (root / "meta" / "weed_extraction" / "episodes.jsonl").read_text().splitlines()]
     labels = json.loads((root / "meta" / "weed_extraction" / "labels.json").read_text())
-    dataset = LeRobotDataset(labels["repo_id"], root=root, depth_output_unit="m")
+    # pyav reads the videos: torchcodec needs FFmpeg libraries not every machine has.
+    dataset = LeRobotDataset(labels["repo_id"], root=root, depth_output_unit="m",
+                             video_backend="pyav")
     plan = json.loads((batch_dir / "plan.json").read_text())
     layout = Layout((plan["settings"]["height"], plan["settings"]["width"]),
                     plan["settings"]["cameras"])

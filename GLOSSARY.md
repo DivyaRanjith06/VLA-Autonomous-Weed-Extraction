@@ -55,3 +55,22 @@ A bed layout kept out of training, used only to measure the model.
 
 **Baseline**:
 The first trained model, using colour images only, that later experiments are compared against.
+
+**Scan**:
+The robot driving along the bed, arm still, looking for weeds with the bed camera.
+_Avoid_: Search, sweep, mapping run
+
+**Weed detector**:
+The part that finds each plant in a bed camera picture and names it sowthistle, shepherd or crop.
+_Avoid_: Classifier, perception model
+
+**Weed map**:
+The list the scan builds of every plant seen: its type, its place along the bed and its bed.
+
+**Pick**:
+Everything the arm does to one weed once the base is parked beside it: reach, grip, twist, lift, carry and drop in the bin.
+_Avoid_: Extraction, grasp (a grasp is only the moment the jaws take the stem)
+
+**Pick model**:
+The trained model that moves the arm during a pick. It does not drive the base or choose the weed.
+_Avoid_: Policy, VLA (in conversation)

@@ -6,9 +6,9 @@ A raw episode is about 180 MB, so the whole batch does not fit on disk at once. 
 is split into chunks, and each chunk goes through the usual pipeline -- generated and
 validated by `generate`, packed by `pack` and inspected against its raw episodes --
 before the raw observations of its accepted episodes are deleted. Everything else is
-kept: every episode's metadata, manifest and validation, and rejected episodes in full.
-Generation is deterministic, so a pruned episode can be regenerated exactly from its
-chunk's plan.
+kept: every episode's metadata, manifest and validation. Rejected episodes lose their raw
+observations too: at about 450 MB each they filled the disk. Generation is deterministic,
+so a pruned episode can be regenerated exactly from its chunk's plan.
 
 The chunk datasets are then merged, one dataset per split, with LeRobot's own
 aggregator, and the merge is checked against them: every non-video value exactly, sampled
@@ -90,8 +90,9 @@ def _chunk(out_dir, name, plan, workers, timeout_s):
     # Marked done before pruning: a rerun must never re-check an episode already pruned,
     # while an interrupted prune only leaves raw frames behind.
     done.write_text(json.dumps(record, indent=2))
-    for episode in accepted:  # packed and checked: the raw frames are no longer needed
-        (batch / "episodes" / episode["id"] / "episode" / "observations.npz").unlink()
+    rejected = [json.loads(line) for line in (batch / "rejected.jsonl").read_text().splitlines()]
+    for episode in accepted + rejected:  # packed and checked, or never to be packed
+        (batch / "episodes" / episode["id"] / "episode" / "observations.npz").unlink(missing_ok=True)
     return record
 
 
@@ -120,9 +121,12 @@ def merge(roots, root, repo_id):
 def verify(root, roots):
     """Hold the merged dataset at `root` to the chunk datasets it was made from."""
     labels = json.loads((Path(root) / "meta/weed_extraction/labels.json").read_text())
-    merged = LeRobotDataset(labels["repo_id"], root=root, depth_output_unit="m")
+    # pyav reads the videos: torchcodec needs FFmpeg libraries not every machine has.
+    merged = LeRobotDataset(labels["repo_id"], root=root, depth_output_unit="m",
+                            video_backend="pyav")
     parts = [LeRobotDataset(json.loads((r / "meta/weed_extraction/labels.json").read_text())
-                            ["repo_id"], root=r, depth_output_unit="m") for r in roots]
+                            ["repo_id"], root=r, depth_output_unit="m", video_backend="pyav")
+             for r in roots]
     problems = []
     if merged.num_episodes != sum(p.num_episodes for p in parts):
         problems.append(f"{merged.num_episodes} episodes, parts hold "
@@ -206,6 +210,9 @@ def main():
     parser.add_argument("--worker-gb", type=float, default=4.0, help="memory per worker")
     parser.add_argument("--workers", type=int, help="default: as many as memory allows")
     parser.add_argument("--timeout", type=float, default=1800, help="seconds per episode")
+    parser.add_argument("--parked", action="store_true",
+                        help="pick-only episodes: the base starts parked beside the weed, "
+                             "and every prompt names the weed type and the bed")
     args = parser.parse_args()
     plan = {"seed": args.seed,
             "settings": {"cameras": args.cameras, "width": args.width, "height": args.height,
@@ -213,7 +220,10 @@ def main():
                          # expert works at it; 1500 steps cover a three-attempt episode
                          # (at most 1428 frames).
                          "control_hz": 25, "max_steps": 1500},
-            "jobs": plan_dataset(args.seed, args.per_scene, args.layouts)}
+            "jobs": plan_dataset(args.seed, args.per_scene, args.layouts,
+                                 ("type_side",) if args.parked else ("type", "type_side"))}
+    if args.parked:
+        plan["settings"]["parked"] = True
     workers = args.workers or default_workers(args.worker_gb)
     print(f"{len(plan['jobs'])} episodes in chunks of {args.chunk_size}, {workers} workers "
           f"-> {args.out_dir}", flush=True)

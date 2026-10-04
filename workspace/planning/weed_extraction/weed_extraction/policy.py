@@ -74,30 +74,37 @@ class DepthToRGBProcessorStep(ObservationProcessorStep):
         return {**features, PipelineFeatureType.OBSERVATION: observations}
 
 
-def policy_features(dataset_features):
+def policy_features(dataset_features, cameras=None):
     """SmolVLA's input and output features for a packed dataset's features: the depth as
-    the step delivers it, and nothing outside `observation.*` and `action`."""
+    the step delivers it, and nothing outside `observation.*` and `action`. `cameras`
+    names the images the policy sees ("bed", "wrist", ...); None is all of them."""
     features = dataset_to_policy_features(dataset_features)
     transformed = DepthToRGBProcessorStep().transform_features({
         PipelineFeatureType.OBSERVATION: {k: f for k, f in features.items()
                                           if f.type is not FeatureType.ACTION},
         PipelineFeatureType.ACTION: {k: f for k, f in features.items()
                                      if f.type is FeatureType.ACTION}})
-    return transformed[PipelineFeatureType.OBSERVATION], transformed[PipelineFeatureType.ACTION]
+    inputs = {k: f for k, f in transformed[PipelineFeatureType.OBSERVATION].items()
+              if f.type is not FeatureType.VISUAL or cameras is None
+              or k.removeprefix("observation.images.") in cameras}
+    return inputs, transformed[PipelineFeatureType.ACTION]
 
 
 def make_processors(config, dataset_stats):
-    """SmolVLA's preprocessor with the depth step at its head, and its postprocessor."""
+    """SmolVLA's preprocessor and postprocessor. The depth step heads the preprocessor
+    when the policy sees the depth."""
     preprocessor, postprocessor = make_pre_post_processors(config, dataset_stats=dataset_stats)
-    preprocessor.steps.insert(0, DepthToRGBProcessorStep())
+    if DepthToRGBProcessorStep.key in config.input_features:
+        preprocessor.steps.insert(0, DepthToRGBProcessorStep())
     return preprocessor, postprocessor
 
 
-def write_model_dir(dataset_root, out_dir, checkpoint="lerobot/smolvla_base"):
+def write_model_dir(dataset_root, out_dir, checkpoint="lerobot/smolvla_base", cameras=None):
     """A SmolVLA model directory for `lerobot_train.py --policy.path`, fitted to the packed
     dataset at `dataset_root`: the checkpoint's weights, symlinked; its config with the
     dataset's policy features; and SmolVLA's processors, depth step first, carrying the
-    dataset's statistics. The cameras keep their own names. Returns `out_dir`.
+    dataset's statistics. The cameras keep their own names; `cameras` limits the policy
+    to some of them. Returns `out_dir`.
     """
     dataset_root, out_dir = Path(dataset_root), Path(out_dir)
     labels = json.loads((dataset_root / "meta" / "weed_extraction" / "labels.json").read_text())
@@ -105,7 +112,7 @@ def write_model_dir(dataset_root, out_dir, checkpoint="lerobot/smolvla_base"):
     weights = Path(hf_hub_download(checkpoint, "model.safetensors")).resolve()
     config_file = Path(hf_hub_download(checkpoint, "config.json"))
     config = PreTrainedConfig.from_pretrained(config_file.parent)
-    config.input_features, config.output_features = policy_features(meta.features)
+    config.input_features, config.output_features = policy_features(meta.features, cameras)
     # The checkpoint holds the whole VLM, so its separate weights need not be fetched.
     config.load_vlm_weights = False
     processors = make_processors(config, meta.stats)
@@ -126,8 +133,10 @@ def main():
     parser.add_argument("dataset_root", type=Path, help="one packed split, e.g. .../train")
     parser.add_argument("out_dir", type=Path)
     parser.add_argument("--checkpoint", default="lerobot/smolvla_base")
+    parser.add_argument("--cameras", nargs="+",
+                        help="the images the policy sees, e.g. bed wrist; default all")
     args = parser.parse_args()
-    print(write_model_dir(args.dataset_root, args.out_dir, args.checkpoint))
+    print(write_model_dir(args.dataset_root, args.out_dir, args.checkpoint, args.cameras))
 
 
 if __name__ == "__main__":

@@ -77,18 +77,15 @@ def test_a_chunked_build_merges_one_checked_dataset_per_split(built):
 
 
 @pytest.mark.slow
-def test_accepted_raw_frames_are_pruned_and_everything_else_kept(built):
+def test_raw_frames_are_pruned_and_everything_else_kept(built):
     out, _ = built
-    for line in (out / "accepted.jsonl").read_text().splitlines():
-        record = json.loads(line)
-        episode = next((out / "chunks").glob(f"*/episodes/{record['id']}/episode"))
-        assert not (episode / "observations.npz").exists()
-        for name in ("episode.json", "manifest.json", "validation.json"):
-            assert (episode / name).exists()
-    for line in (out / "rejected.jsonl").read_text().splitlines():  # kept in full
-        record = json.loads(line)
-        episode = next((out / "chunks").glob(f"*/episodes/{record['id']}/episode"))
-        assert (episode / "observations.npz").exists()
+    for name in ("accepted.jsonl", "rejected.jsonl"):
+        for line in (out / name).read_text().splitlines():
+            record = json.loads(line)
+            episode = next((out / "chunks").glob(f"*/episodes/{record['id']}/episode"))
+            assert not (episode / "observations.npz").exists()
+            for kept in ("episode.json", "manifest.json", "validation.json"):
+                assert (episode / kept).exists()
 
 
 @pytest.mark.slow
