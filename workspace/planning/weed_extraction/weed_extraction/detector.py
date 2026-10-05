@@ -34,7 +34,8 @@ class WeedDetector:
     # What a box can be. A plant's body is named <type>_<number>.
     LABELS = ("sowthistle", "shepherd", "strawberry")
 
-    def __init__(self, path, device="cuda"):
+    def __init__(self, path, device=None):
+        device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         saved = torch.load(path, map_location=device)
         self.heights = saved["heights"]
         self.device = device

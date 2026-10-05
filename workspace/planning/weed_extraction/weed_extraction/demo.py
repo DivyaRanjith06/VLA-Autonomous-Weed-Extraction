@@ -207,8 +207,9 @@ def run(demo, seconds, viewer):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("prompt", help='e.g. "remove the shepherd weed"; after it, the '
-                                       "demo asks for the next")
+    parser.add_argument("prompt", nargs="?",
+                        help='e.g. "remove the shepherd weed"; asked for if left out. After '
+                             "it, the demo asks for the next")
     parser.add_argument("--detector", type=Path, default=Path("models/detector.pt"))
     parser.add_argument("--family", default="midday_dry", choices=list(Manifest.FAMILIES))
     parser.add_argument("--variant", type=int, default=0,
@@ -218,6 +219,13 @@ def main():
                         help="simulated time allowed per prompt")
     parser.add_argument("--headless", action="store_true", help="no viewer, result only")
     args = parser.parse_args()
+    if args.prompt is None:
+        try:
+            args.prompt = input("Enter your instruction: ").strip()
+        except EOFError:
+            args.prompt = ""
+        if not args.prompt:
+            raise SystemExit("no instruction given")
 
     manifest = Manifest.variants(args.family, args.variant + 1)[args.variant]
     scene_dir = Path("outputs/demo") / f"{args.family}_{args.variant}"
