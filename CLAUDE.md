@@ -148,7 +148,8 @@ VLA-Weed-Extraction/
 │   ├── simulate.sh           launcher; works natively and inside the container
 │   ├── test_up_root.sh       scripted grasp-twist-pull demo in the viewer
 │   ├── train.sh              fine-tune SmolVLA on dataset v2 (bed and wrist cameras, vision frozen)
-│   └── demo.sh               type a prompt: scan the bed, park at a matching weed, pick it
+│   ├── demo.sh               type a prompt: scan the bed, park at a matching weed, pick it
+│   └── ui.sh                 browser UI: pick a held-out environment, type a prompt, the demo runs in the native viewer
 ├── docker_scripts/run_scripts/   build (passes --build-arg), base, devel, up, enter_bash, stop
 ├── models/                   Git LFS: detector.pt (the demo's weed detector), smolvla_weeds/ (the baseline SmolVLA, 20,000 steps)
 ├── outputs/                  generated scenes and datasets; git-ignored
@@ -185,9 +186,12 @@ VLA-Weed-Extraction/
             │   ├── dataset.py        chunked build: generate, pack, check, prune, merge
             │   ├── policy.py         SmolVLA input boundary: depth step, features, model directory
             │   ├── detector.py       weed detector on the bed camera: render labelled pictures, train, place plants
-            │   └── demo.py           state machine: back up, scan, go, pick (the scripted expert), return home; asks for the next prompt
+            │   ├── demo.py           state machine: back up, scan, go, pick (the scripted expert), return home; asks for the next prompt
+            │   ├── smolvla_probe.py  one SmolVLA inference on a live observation; prints the 9-D action, never applies it
+            │   ├── vla_runner.py     SmolVLA in the loop: observation in, one 9-D action per tick applied with env.step (not used by the UI)
+            │   └── ui.py             browser UI (stdlib http.server) around demo.Demo; one worker thread owns the scene and the viewer
             ├── configs/{view,capture,uproot}.yaml
-            └── tests/                14 files: test_scene (the MJCF), test_manifest (scene.py), one per other module but launch.py and demo.py
+            └── tests/                16 files: test_scene (the MJCF), test_manifest (scene.py), test_ui (ui.py, vla_runner.py), one per other module but launch.py
 ```
 
 ### Active scene: `workspace/application/field_description/scene_mobile_field.xml`
@@ -231,12 +235,27 @@ The trained models were dropped from the demo: the baseline and the pick-only mo
 
 The weed detector (`detector.py`) is a torchvision Faster R-CNN over three labels: sowthistle, shepherd, strawberry. `render` saves bed camera pictures from stops along the rail of 54 catalogue scenes, boxed by the simulator's segmentation render. `train` fits the 40 training scenes and checks the 14 held-out ones. A box is placed on the bed where its ray meets a plane at a height measured per label.
 
+### Browser UI
+
+`run_scripts/ui.sh` serves `http://127.0.0.1:8765/` and opens it in the browser. The flow is: pick an environment from its picture, type a prompt (autocomplete offers plain-text suggestions), EXECUTE. Only then is the scene built (or reused) and the native MuJoCo viewer opened, as with `demo.sh`; the page itself shows only the wrist camera, the live 9-D action and the status. The robot is run by the demo's own state machine (`demo.Demo`, picking with `Uprooter`) through `demo.run`, exactly as `demo.sh` runs a prompt; no trained policy is used. Flags: `--detector` (default `models/detector.pt`), `--seconds` (as the demo: 90 simulated seconds, 600 for an "all" prompt), `--port`, `--no-browser`, `--no-viewer` (no display, for tests), `--log-first/--log-last/--log-every`. Only the Python standard library and Pillow: the project's venv has no GUI toolkit.
+
+- **Threads**: request handlers read a lock-protected snapshot (wrist image, applied action, step, time, status) and put `execute` commands on a queue; a second command while one runs is refused (409). STOP is a `threading.Event`, cleared when a prompt is accepted, so a STOP pressed while the run is still loading counts. One worker thread owns the demo, its scene and the viewer. `demo.run` is handed `ui.Live` as its viewer: after every tick it syncs the native viewer and renders the wrist camera off-screen from the same `MjData`, and it reports the run over on STOP or a closed window.
+- **Rendering setup**: importing `weed_extraction` already loads mujoco and glfw, so `ui.main()` re-executes itself once with `MUJOCO_GL=egl` (the wrist and bed renderers never touch GLFW) and, when there is an X display, `PYGLFW_LIBRARY_VARIANT=x11` (the viewer on XWayland). With GLFW's Wayland build, or with GLFW rendering from the worker thread, a closed viewer's render loop could stay blocked and hang GLFW's cleanup at exit. Closing a viewer also waits for its render thread to end.
+- **Environments**: only the held-out ones, from `Manifest._split` over the 9-variant catalogue: evening_cool 0 to 8 and variant 4 of the other five families (14). Each picture is that scene's own overview camera with the robot at home, rendered once into `outputs/ui/thumbs/` by child processes at start-up. A scene is built by `Demo` itself (bed camera, 25 Hz, the demo's halved roots).
+- **Lifecycle**: a `Demo` (scene and detector) is built when an environment is first used and kept while it stays selected. Every prompt resets the scene and re-applies the demo's root easing, so each starts as a new `Demo` would. Choosing another environment closes the viewer, the wrist renderer and the scene before building the next (each compiled scene still holds about 200 MB until the process exits). Closing the viewer window stops the run ("Viewer closed."); the next prompt opens a new one. Ctrl+C or SIGTERM stops the server, then the worker closes the viewer and the scene.
+- **Prompt check** (`ui.PromptCheck`): anything may be typed. A prompt reaches the demo only if `demo.Command.parse` accepts it (one weed type, at most one bed, optionally all/every/field/standing), it names no strawberry and has no negation (not, don't, never, except, without, any n't). It is passed to the demo as typed. Anything else shows "Invalid prompt. Please provide a valid weed-extraction prompt." and no scene is built or touched.
+- **Autocomplete**: the 24 trained wordings (both weed types, alone and with each bed), matched word by word while typing, shown as plain text.
+- **Ends**: the state machine back home → FINISHED (the terminal prints the demo's RESULT text); STOP, the time limit or a closed viewer → STOPPED; any exception → ERROR.
+- **Telemetry**: the page shows `env.data.ctrl` after each tick. The demo's `ActionLog` logs the same values to `outputs/demo_logs/<time>/`.
+- **Terminal**: the demo's own printout (states, map, actions, summary) is redirected away during a UI run; the terminal shows only the server URL, environment loaded, execution started, and completed (with the demo's RESULT text) or stopped. Tracebacks still go to stderr. `demo.sh` prints as before.
+- Checked 2026-10-11: through the UI worker, low_light 4, "remove the shepherd weed from the left bed" binned shepherd_1 and finished in 28.9 simulated seconds.
+
 ## 6. Maintenance Protocol
 
 After every completed implementation step, update this file: structure, pipeline, and the state below. Remove claims that stopped being true rather than appending corrections.
 
 **State (2026-10-03):**
-- 230 tests passed on 2026-09-25, about 20 minutes; since then only `test_detector.py` (2 tests) and the planning tests of `test_generate.py` were run. Tests needing the `smolvla` extra skip without it.
+- 2026-10-11: 310 tests, 302 passed in 31 minutes (the slow UI tests open the native viewer and need a display; the UI tests passed again after the UI moved to the demo). The 8 errors are `test_pack.py`'s module fixture: it expects both of its episodes accepted, but the held-out one (evening_cool 0, "remove the sowthistle weed") is rejected for crop contact (mobile base on strawberry_8, 413 N). Tests needing the `smolvla` extra skip without it.
 - Pinned: MuJoCo 3.13.0, mink 1.3.0; the `smolvla` extra pins torch 2.11.0, transformers 5.5.4 and datasets 4.8.5.
 - The baseline (dataset v2, 20,000 steps at batch 5, `outputs/train/smolvla_weeds`) does not reach a weed: it guesses where to drive, because most recorded weeds start out of the bed camera's view. `docs/adr/0002` splits the task instead.
 - Weed detector on the 14 held-out scenes: 382 of 383 sowthistles and 322 of 347 shepherd weeds found, no wrong types, median 5 to 6 mm off along the bed.
